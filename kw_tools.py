@@ -1,0 +1,334 @@
+#!/usr/bin/env python3
+"""
+kw_tools.py — Keyword filter toolkit for AI data preparation.
+
+Subcommands (each independently runnable):
+  search   Find all keyword occurrences in files
+  clear    Erase keywords in-place
+  replace  Replace keywords with tokens + emit mapping table
+  restore  Reverse a replace using a mapping table
+
+Keyword list format: one keyword per line, UTF-8, blank lines / # comments ignored.
+"""
+from __future__ import annotations
+
+import argparse
+import bisect
+import json
+import re
+import shutil
+import sys
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Iterator
+
+
+# ── Keyword list loading ───────────────────────────────────────────────────────
+
+def load_keywords(path: str) -> list[str]:
+    """Load keywords from file; skip blank lines and # comments."""
+    keywords = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            keywords.append(stripped)
+    if not keywords:
+        print("[warn] keyword file is empty", file=sys.stderr)
+    return keywords
+
+
+def sorted_keywords(keywords: list[str]) -> list[str]:
+    """Return keywords sorted by length (longest first) to avoid partial masking."""
+    return sorted(keywords, key=len, reverse=True)
+
+
+def build_pattern(keywords: list[str]) -> re.Pattern:
+    """Compile all keywords into one regex for efficient multi-keyword search."""
+    parts = [re.escape(kw) for kw in sorted_keywords(keywords)]
+    return re.compile("|".join(parts))
+
+
+# ── File discovery ─────────────────────────────────────────────────────────────
+
+def iter_files(target: str, recursive: bool, include_binary: bool) -> Iterator[Path]:
+    root = Path(target)
+    glob = "**/*" if recursive else "*"
+    for p in (root.rglob("*") if recursive else root.iterdir()):
+        if not p.is_file():
+            continue
+        if not include_binary and _is_binary(p):
+            continue
+        yield p
+
+
+def _is_binary(path: Path) -> bool:
+    """Heuristic: read first 8 KB and check for null bytes."""
+    try:
+        chunk = path.read_bytes()[:8192]
+        return b"\x00" in chunk
+    except OSError:
+        return False
+
+
+# ── Binary-search helpers (for sorted keyword lookups) ────────────────────────
+
+def keyword_exists_bsearch(sorted_kws: list[str], keyword: str) -> bool:
+    """O(log n) existence check on a sorted keyword list."""
+    idx = bisect.bisect_left(sorted_kws, keyword)
+    return idx < len(sorted_kws) and sorted_kws[idx] == keyword
+
+
+# ── 1. SEARCH ─────────────────────────────────────────────────────────────────
+
+@dataclass
+class Match:
+    file: str
+    line: int      # 1-based
+    col: int       # 1-based
+    keyword: str
+    context: str   # surrounding line text
+
+
+def cmd_search(args: argparse.Namespace) -> None:
+    keywords = load_keywords(args.keywords)
+    if not keywords:
+        return
+
+    pattern = build_pattern(keywords)
+    matches: list[Match] = []
+
+    for fpath in iter_files(args.target, args.recursive, args.binary):
+        try:
+            text = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            print(f"[skip] {fpath}: {e}", file=sys.stderr)
+            continue
+
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            for m in pattern.finditer(line):
+                matches.append(
+                    Match(
+                        file=str(fpath),
+                        line=lineno,
+                        col=m.start() + 1,
+                        keyword=m.group(0),
+                        context=line.rstrip(),
+                    )
+                )
+
+    if not matches:
+        print("No keywords found.")
+        return
+
+    # Group output by file
+    current_file = None
+    for m in matches:
+        if m.file != current_file:
+            current_file = m.file
+            print(f"\n{m.file}")
+            print("-" * len(m.file))
+        print(f"  line {m.line:>5}, col {m.col:>4}  [{m.keyword!r}]  {m.context}")
+
+    print(f"\nTotal: {len(matches)} occurrence(s) across "
+          f"{len({m.file for m in matches})} file(s).")
+
+    if args.output:
+        data = [
+            {"file": m.file, "line": m.line, "col": m.col,
+             "keyword": m.keyword, "context": m.context}
+            for m in matches
+        ]
+        Path(args.output).write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                                     encoding="utf-8")
+        print(f"Results saved → {args.output}")
+
+
+# ── 2. CLEAR ──────────────────────────────────────────────────────────────────
+
+def cmd_clear(args: argparse.Namespace) -> None:
+    keywords = load_keywords(args.keywords)
+    if not keywords:
+        return
+
+    pattern = build_pattern(keywords)
+    replacement = args.replacement  # default ""
+
+    changed = 0
+    for fpath in iter_files(args.target, args.recursive, False):
+        try:
+            original = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            print(f"[skip] {fpath}: {e}", file=sys.stderr)
+            continue
+
+        new_text, n = pattern.subn(replacement, original)
+        if n == 0:
+            continue
+
+        if args.backup:
+            shutil.copy2(fpath, str(fpath) + ".bak")
+
+        fpath.write_text(new_text, encoding="utf-8")
+        print(f"  cleared {n:>4} occurrence(s)  {fpath}")
+        changed += n
+
+    print(f"\nDone. Cleared {changed} occurrence(s) total.")
+
+
+# ── 3. REPLACE ────────────────────────────────────────────────────────────────
+
+def cmd_replace(args: argparse.Namespace) -> None:
+    keywords = load_keywords(args.keywords)
+    if not keywords:
+        return
+
+    pattern = build_pattern(keywords)
+    mapping: dict[str, str] = {}   # token -> original keyword
+    changed_files = 0
+
+    def make_token(keyword: str) -> str:
+        """Return a stable token per unique keyword."""
+        for tok, kw in mapping.items():
+            if kw == keyword:
+                return tok
+        token = f"[[KW_{uuid.uuid4().hex[:8].upper()}]]"
+        mapping[token] = keyword
+        return token
+
+    for fpath in iter_files(args.target, args.recursive, False):
+        try:
+            original = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            print(f"[skip] {fpath}: {e}", file=sys.stderr)
+            continue
+
+        def replacer(m: re.Match) -> str:
+            return make_token(m.group(0))
+
+        new_text, n = pattern.subn(replacer, original)
+        if n == 0:
+            continue
+
+        if args.backup:
+            shutil.copy2(fpath, str(fpath) + ".bak")
+
+        fpath.write_text(new_text, encoding="utf-8")
+        print(f"  replaced {n:>4} occurrence(s)  {fpath}")
+        changed_files += 1
+
+    # Save mapping table
+    mapping_path = Path(args.mapping)
+    mapping_path.write_text(
+        json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"\nMapping table ({len(mapping)} token(s)) saved → {args.mapping}")
+    print(f"Processed {changed_files} file(s).")
+
+
+# ── 4. RESTORE ────────────────────────────────────────────────────────────────
+
+def cmd_restore(args: argparse.Namespace) -> None:
+    mapping_path = Path(args.mapping)
+    if not mapping_path.exists():
+        print(f"[error] mapping file not found: {args.mapping}", file=sys.stderr)
+        sys.exit(1)
+
+    mapping: dict[str, str] = json.loads(mapping_path.read_text(encoding="utf-8"))
+    if not mapping:
+        print("[warn] mapping table is empty.")
+        return
+
+    # Build one regex that matches any token (tokens contain literal brackets)
+    token_pattern = re.compile("|".join(re.escape(t) for t in mapping))
+    changed_files = 0
+
+    for fpath in iter_files(args.target, args.recursive, False):
+        try:
+            original = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            print(f"[skip] {fpath}: {e}", file=sys.stderr)
+            continue
+
+        def restore_token(m: re.Match) -> str:
+            return mapping[m.group(0)]
+
+        new_text, n = token_pattern.subn(restore_token, original)
+        if n == 0:
+            continue
+
+        if args.backup:
+            shutil.copy2(fpath, str(fpath) + ".bak")
+
+        fpath.write_text(new_text, encoding="utf-8")
+        print(f"  restored {n:>4} token(s)  {fpath}")
+        changed_files += 1
+
+    print(f"\nDone. Restored tokens in {changed_files} file(s).")
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="Keyword filter toolkit for AI data preparation.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    sub = p.add_subparsers(dest="command", required=True)
+
+    # shared flags
+    def add_common(sp, need_keywords=True, need_target=True, need_backup=True):
+        if need_keywords:
+            sp.add_argument("-k", "--keywords", required=True,
+                            metavar="FILE", help="keyword list file (one per line)")
+        if need_target:
+            sp.add_argument("-t", "--target", required=True,
+                            metavar="PATH", help="file or directory to process")
+            sp.add_argument("-r", "--recursive", action="store_true",
+                            help="recurse into subdirectories")
+        if need_backup:
+            sp.add_argument("--backup", action="store_true",
+                            help="save .bak copy before modifying each file")
+
+    # search
+    s1 = sub.add_parser("search", help="find all keyword occurrences")
+    add_common(s1, need_backup=False)
+    s1.add_argument("--binary", action="store_true",
+                    help="also search binary files")
+    s1.add_argument("-o", "--output", metavar="JSON",
+                    help="save results to JSON file")
+    s1.set_defaults(func=cmd_search)
+
+    # clear
+    s2 = sub.add_parser("clear", help="erase keywords from files")
+    add_common(s2)
+    s2.add_argument("--replacement", default="",
+                    help="string to replace keywords with (default: empty)")
+    s2.set_defaults(func=cmd_clear)
+
+    # replace
+    s3 = sub.add_parser("replace", help="replace keywords with tokens")
+    add_common(s3)
+    s3.add_argument("-m", "--mapping", required=True,
+                    metavar="JSON", help="output mapping table path")
+    s3.set_defaults(func=cmd_replace)
+
+    # restore
+    s4 = sub.add_parser("restore", help="restore tokens using mapping table")
+    add_common(s4, need_keywords=False)
+    s4.add_argument("-m", "--mapping", required=True,
+                    metavar="JSON", help="mapping table produced by replace")
+    s4.set_defaults(func=cmd_restore)
+
+    return p
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

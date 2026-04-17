@@ -1,0 +1,11 @@
+# Personal information
+John Doe
+jane.doe@example.com
+
+# Company / org
+Acme Corp
+Project Phoenix
+
+# Secrets
+secret_token_xyz
+sk-live-abc123def456ghi789
