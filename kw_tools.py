@@ -7,6 +7,7 @@ Subcommands (each independently runnable):
   clear    Erase keywords in-place
   replace  Replace keywords with tokens + emit mapping table
   restore  Reverse a replace using a mapping table
+  cleanlog Drop every line that contains a keyword (log sanitisation)
 
 Keyword list format: one keyword per line, UTF-8, blank lines / # comments ignored.
 """
@@ -53,7 +54,10 @@ def build_pattern(keywords: list[str]) -> re.Pattern:
 
 def iter_files(target: str, recursive: bool, include_binary: bool) -> Iterator[Path]:
     root = Path(target)
-    glob = "**/*" if recursive else "*"
+    if root.is_file():
+        if include_binary or not _is_binary(root):
+            yield root
+        return
     for p in (root.rglob("*") if recursive else root.iterdir()):
         if not p.is_file():
             continue
@@ -267,6 +271,65 @@ def cmd_restore(args: argparse.Namespace) -> None:
     print(f"\nDone. Restored tokens in {changed_files} file(s).")
 
 
+# ── 5. CLEANLOG ───────────────────────────────────────────────────────────────
+
+def cmd_cleanlog(args: argparse.Namespace) -> None:
+    keywords = load_keywords(args.keywords)
+    if not keywords:
+        return
+
+    pattern = build_pattern(keywords)
+    total_removed = 0
+    total_kept = 0
+
+    for fpath in iter_files(args.target, args.recursive, False):
+        try:
+            original = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            print(f"[skip] {fpath}: {e}", file=sys.stderr)
+            continue
+
+        lines = original.splitlines(keepends=True)
+        kept, removed = [], []
+        for line in lines:
+            if pattern.search(line):
+                removed.append(line)
+            else:
+                kept.append(line)
+
+        if not removed:
+            continue
+
+        if args.dry_run:
+            print(f"\n{fpath}  ({len(removed)} line(s) would be removed)")
+            for ln in removed:
+                print(f"  - {ln.rstrip()}")
+            continue
+
+        if args.backup:
+            shutil.copy2(fpath, str(fpath) + ".bak")
+
+        fpath.write_text("".join(kept), encoding="utf-8")
+        total_removed += len(removed)
+        total_kept += len(kept)
+
+        if args.stats:
+            pct = len(removed) / len(lines) * 100
+            print(f"  {len(removed):>5} removed / {len(kept):>5} kept  ({pct:.1f}%)  {fpath}")
+        else:
+            print(f"  removed {len(removed):>5} line(s)  {fpath}")
+
+    if args.dry_run:
+        return
+
+    if total_removed == 0:
+        print("No matching lines found.")
+    else:
+        total_lines = total_removed + total_kept
+        pct = total_removed / total_lines * 100 if total_lines else 0
+        print(f"\nDone. Removed {total_removed} line(s) / kept {total_kept} ({pct:.1f}% stripped).")
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -320,6 +383,15 @@ def build_parser() -> argparse.ArgumentParser:
     s4.add_argument("-m", "--mapping", required=True,
                     metavar="JSON", help="mapping table produced by replace")
     s4.set_defaults(func=cmd_restore)
+
+    # cleanlog
+    s5 = sub.add_parser("cleanlog", help="drop every line containing a keyword")
+    add_common(s5)
+    s5.add_argument("--dry-run", action="store_true",
+                    help="preview which lines would be removed without modifying files")
+    s5.add_argument("--stats", action="store_true",
+                    help="show removed/kept counts and percentage per file")
+    s5.set_defaults(func=cmd_cleanlog)
 
     return p
 

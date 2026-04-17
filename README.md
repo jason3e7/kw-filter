@@ -10,6 +10,7 @@ A CLI toolkit for filtering sensitive keywords from files before sending them to
 | `clear` | Erase keywords in-place (replace with empty string or custom text) |
 | `replace` | Replace keywords with anonymous tokens and emit a mapping table |
 | `restore` | Use the mapping table to put original values back |
+| `cleanlog` | Drop every line that contains a keyword (log sanitisation) |
 
 Each command is fully independent and can be run on its own.
 
@@ -91,6 +92,17 @@ python3 kw_tools.py restore -m mapping.json -t ./data -r
 
 Does not require the keyword list — only the mapping table.
 
+### 5. Cleanlog — drop sensitive log lines
+
+```bash
+python3 kw_tools.py cleanlog -k keywords.txt -t ./logs -r
+python3 kw_tools.py cleanlog -k keywords.txt -t app.log --dry-run   # preview
+python3 kw_tools.py cleanlog -k keywords.txt -t ./logs -r --stats   # show %
+python3 kw_tools.py cleanlog -k keywords.txt -t app.log --backup    # keep .bak
+```
+
+Unlike `clear` (which removes only the matched text), `cleanlog` removes the **entire line** whenever a keyword appears anywhere on it. Designed for log files where a partial redaction is not sufficient.
+
 ## Typical workflow
 
 ```bash
@@ -117,6 +129,8 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 | `--backup` | clear, replace, restore | Save `.bak` copy before modifying |
 | `--replacement TEXT` | clear | Fill string instead of empty (default: `""`) |
 | `-o FILE` | search | Save search results as JSON |
+| `--dry-run` | cleanlog | Preview lines to remove without modifying files |
+| `--stats` | cleanlog | Show removed/kept count and percentage per file |
 
 ## Running tests
 
@@ -124,7 +138,7 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 python3 -m pytest tests/ -v
 ```
 
-93 tests covering:
+115 tests covering:
 - Unit tests for all helper functions (`test_utils.py`)
 - Per-command tests with edge cases (`test_search/clear/replace/restore.py`)
 - End-to-end CLI integration tests via subprocess (`test_integration.py`)
