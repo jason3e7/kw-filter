@@ -110,7 +110,7 @@ class TestIgnoreCaseSearch:
     def test_no_match_without_flag(self, tmp_path, capsys):
         f = tmp_path / "t.txt"
         f.write_text("HELLO world\n", encoding="utf-8")
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f))
+        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, ignore_case=False))
         assert "No keywords found" in capsys.readouterr().out
 
     def test_mixed_case_match(self, tmp_path, capsys):

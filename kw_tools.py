@@ -471,8 +471,10 @@ def build_parser() -> argparse.ArgumentParser:
         if need_target:
             sp.add_argument("-t", "--target", required=True,
                             metavar="PATH", help="file or directory to process")
-            sp.add_argument("-r", "--recursive", action="store_true",
-                            help="recurse into subdirectories")
+            sp.add_argument("-r", dest="recursive", action="store_true", default=True,
+                            help="recurse into subdirectories (default: on)")
+            sp.add_argument("--no-r", dest="recursive", action="store_false",
+                            help="disable recursive")
         if need_backup:
             sp.add_argument("--backup", action="store_true",
                             help="save .bak copy before modifying each file")
@@ -480,8 +482,10 @@ def build_parser() -> argparse.ArgumentParser:
             sp.add_argument("--dry-run", action="store_true",
                             help="preview changes without modifying files")
         if need_ignore_case:
-            sp.add_argument("-i", "--ignore-case", action="store_true",
-                            help="match keywords case-insensitively")
+            sp.add_argument("-i", dest="ignore_case", action="store_true", default=True,
+                            help="case-insensitive matching (default: on)")
+            sp.add_argument("--no-i", dest="ignore_case", action="store_false",
+                            help="case-sensitive matching")
 
     # search
     s1 = sub.add_parser("search", help="find all keyword occurrences")

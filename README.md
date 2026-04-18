@@ -159,13 +159,13 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 |---|---|---|
 | `-k FILE` | search, clear, replace, cleanlog | Keyword list file |
 | `-t PATH` | all | Target file or directory |
-| `-r` | all | Recurse into subdirectories |
+| `-r` / `--no-r` | all | Recurse into subdirectories (default: on) |
 | `-m FILE` | replace, restore | Mapping table JSON path (default: `mapping.json`) |
 | `--backup` | clear, replace, restore, remap | Save `.bak` copy before modifying |
 | `--replacement TEXT` | clear | Fill string instead of empty (default: `""`) |
 | `-o FILE` | search | Save search results as JSON |
 | `--dry-run` | clear, replace, restore, cleanlog, remap | Preview changes without modifying files |
-| `-i, --ignore-case` | search, clear, replace, cleanlog, remap | Match keywords case-insensitively |
+| `-i` / `--no-i` | search, clear, replace, cleanlog, remap | Case-insensitive matching (default: on) |
 | `--stats` | cleanlog | Show removed/kept count and percentage per file |
 | `--remap FILE` | remap | Remap list file (`original -> replacement`) |
 
