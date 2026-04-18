@@ -759,11 +759,7 @@ def s14_quickstart(prs):
     slide = blank(prs)
     heading(slide, "立刻開始使用")
 
-    # Left column — code blocks
-    # Heights: label(0.3) + lines×17pt + 18pt padding
-    # install: 2 lines → 0.3 + (34+18)pt = 0.3 + 0.72" = 1.02" → use 1.05"
-    # kw_file: 4 lines → 0.3 + (68+18)pt = 0.3 + 1.19" = 1.49" → use 1.55"
-    # run_cmd: 4 lines → 0.3 + (68+18)pt = 0.3 + 1.19" = 1.49" → use 1.55"
+    # Left column
     install = "git clone https://github.com/jason3e7/kw-filter.git\ncd kw-filter"
     kw_file = "# keywords.txt\nJohn Doe\nacme-corp.com\nsk-live-abc123"
     run_cmd = ("# 遞迴 + 大小寫不分均為預設，無需額外參數\n"
@@ -777,31 +773,51 @@ def s14_quickstart(prs):
     code_block(slide, ML, BODY_TOP + Inches(1.17), HW, Inches(1.55), kw_file, "建立關鍵字清單")
     code_block(slide, ML, BODY_TOP + Inches(2.84), HW, Inches(1.55), run_cmd, "執行")
 
-    # Right column — test(2 lines=1.05") + summary card
-    test_code = "pip install pytest\npython3 -m pytest tests/ -v"
-    code_block(slide, R, BODY_TOP, HW, Inches(1.05), test_code, "執行測試")
+    # Right column — online tool card + test + summary
+    # Online tool card (highlight box)
+    online_box = rect(slide, R, BODY_TOP, HW, Inches(1.25),
+                      fill_color=RGBColor(0x0a, 0x24, 0x18), border_color=ACCENT, border_pt=2)
+    tf_o = online_box.text_frame; tf_o.word_wrap = True
+    _set_txbody_margins(tf_o._txBody, l=Pt(13), t=Pt(10))
+    p_o = tf_o.paragraphs[0]; p_o.alignment = PP_ALIGN.LEFT
+    ro1 = p_o.add_run()
+    ro1.text = "🌐  線上互動工具（無需安裝）"
+    ro1.font.size = Pt(14); ro1.font.bold = True
+    ro1.font.color.rgb = ACCENT; ro1.font.name = "Noto Sans TC"
+    p_o2 = tf_o.add_paragraph(); p_o2.space_before = Pt(5); p_o2.alignment = PP_ALIGN.LEFT
+    ro2 = p_o2.add_run()
+    ro2.text = "jason3e7.github.io/kw-filter/kw_tools.html"
+    ro2.font.size = Pt(12.5); ro2.font.color.rgb = BLUE; ro2.font.name = "Courier New"
+    p_o3 = tf_o.add_paragraph(); p_o3.space_before = Pt(4); p_o3.alignment = PP_ALIGN.LEFT
+    ro3 = p_o3.add_run()
+    ro3.text = "載入檔案 → 選擇操作 → 下載結果，不需 Python 環境"
+    ro3.font.size = Pt(12); ro3.font.color.rgb = MUTED; ro3.font.name = "Noto Sans TC"
 
-    shape = rect(slide, R, BODY_TOP + Inches(1.17), HW, Inches(3.22),
+    # Test block
+    test_code = "pip install pytest\npython3 -m pytest tests/ -v"
+    code_block(slide, R, BODY_TOP + Inches(1.38), HW, Inches(1.05), test_code, "執行測試")
+
+    # Summary card
+    shape = rect(slide, R, BODY_TOP + Inches(2.55), HW, Inches(1.84),
                  fill_color=RGBColor(0x0f, 0x1f, 0x12), border_color=ACCENT)
     tf = shape.text_frame; tf.word_wrap = True
-    _set_txbody_margins(tf._txBody, l=Pt(13), t=Pt(11))
+    _set_txbody_margins(tf._txBody, l=Pt(13), t=Pt(10))
 
     summary_title = tf.paragraphs[0]
     summary_title.alignment = PP_ALIGN.LEFT
     rt = summary_title.add_run()
-    rt.text = "重點回顧"; rt.font.size = Pt(15); rt.font.bold = True
+    rt.text = "重點回顧"; rt.font.size = Pt(14); rt.font.bold = True
     rt.font.color.rgb = ACCENT; rt.font.name = "Noto Sans TC"
 
-    for item in ["6 個獨立 CLI 指令 + HTML 互動工具",
+    for item in ["6 個 CLI 指令 + GitHub Pages 線上工具",
                  "遞迴 & 大小寫不分均為預設行為",
                  "replace → restore  100% 還原",
-                 "10 萬行在 0.34 秒 內處理完畢",
                  "160+ 個測試，零第三方依賴",
                  "Playwright 情境：爬蟲 → AI → 可執行腳本"]:
-        p = tf.add_paragraph(); p.space_before = Pt(5)
+        p = tf.add_paragraph(); p.space_before = Pt(4)
         p.alignment = PP_ALIGN.LEFT
         run = p.add_run(); run.text = "▸  " + item
-        run.font.size = Pt(13.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
+        run.font.size = Pt(12.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
 
     txtbox(slide, ML, Inches(6.55), CW, Inches(0.3),
            "github.com/jason3e7/kw-filter",

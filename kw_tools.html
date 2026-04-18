@@ -261,16 +261,18 @@
   <div class="io">
 
     <!-- Input pane -->
-    <div class="io-pane">
+    <div class="io-pane" id="input-pane">
       <div class="io-head">
-        <span>INPUT</span>
+        <span id="input-label">INPUT</span>
         <div class="btns">
-          <button class="btn" onclick="document.getElementById('input').value=''; status('已清除')">清除</button>
+          <button class="btn" onclick="document.getElementById('input').value=''; _inputFilename=null; document.getElementById('input-label').textContent='INPUT'; status('已清除')">清除</button>
           <button class="btn" onclick="pasteIn()">貼上</button>
+          <button class="btn btn-load" onclick="document.getElementById('file-input').click()">📂 載入檔案</button>
+          <input type="file" id="file-input" style="display:none" onchange="loadFile(this)">
         </div>
       </div>
       <textarea id="input" spellcheck="false"
-        placeholder="在這裡貼上要處理的文字…"></textarea>
+        placeholder="在這裡貼上要處理的文字，或拖曳 / 載入檔案…"></textarea>
     </div>
 
     <!-- Output pane -->
@@ -279,6 +281,7 @@
         <span>OUTPUT</span>
         <div class="btns">
           <button class="btn" onclick="copyOut()">複製</button>
+          <button class="btn" onclick="downloadOut()">💾 下載</button>
           <button class="btn" onclick="swapIO()">⇄ 交換</button>
         </div>
       </div>
@@ -300,6 +303,42 @@
 <div id="status">就緒</div>
 
 <script>
+// ── File I/O ─────────────────────────────────────────────────────────────────
+
+let _inputFilename = null;
+
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _inputFilename = file.name;
+  document.getElementById('input-label').textContent = 'INPUT  —  ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('input').value = e.target.result;
+    status(`已載入：${file.name}  (${_fmtSize(file.size)})`);
+  };
+  reader.readAsText(file, 'utf-8');
+  input.value = '';   // reset so same file can be re-selected
+}
+
+function downloadOut() {
+  const text = document.getElementById('output').value;
+  if (!text) { status('⚠️  輸出為空'); return; }
+  const base = _inputFilename
+    ? _inputFilename.replace(/(\.[^.]+)?$/, m => `_${currentOp}${m || '.txt'}`)
+    : `output_${currentOp}.txt`;
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = base; a.click();
+  URL.revokeObjectURL(url);
+  status(`已下載：${base}`);
+}
+
+function _fmtSize(n) {
+  return n < 1024 ? n + ' B' : n < 1048576 ? (n/1024).toFixed(1) + ' KB' : (n/1048576).toFixed(1) + ' MB';
+}
+
 // ── Utilities ───────────────────────────────────────────────────────────────
 
 function escRe(s)   { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -587,6 +626,31 @@ function swapIO() {
 }
 
 function status(msg) { document.getElementById('status').textContent = msg; }
+
+// ── Drag & drop on input pane ────────────────────────────────────────────────
+
+(function() {
+  const pane = document.getElementById('input-pane');
+  ['dragenter','dragover'].forEach(ev => pane.addEventListener(ev, e => {
+    e.preventDefault(); pane.style.outline = '2px dashed var(--accent)';
+  }));
+  ['dragleave','drop'].forEach(ev => pane.addEventListener(ev, e => {
+    pane.style.outline = '';
+  }));
+  pane.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    _inputFilename = file.name;
+    document.getElementById('input-label').textContent = 'INPUT  —  ' + file.name;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('input').value = ev.target.result;
+      status(`已載入：${file.name}  (${_fmtSize(file.size)})`);
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+})();
 
 // Init
 refreshUI();
