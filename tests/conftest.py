@@ -64,6 +64,16 @@ def ns_cleanlog(keywords, target, recursive=False, backup=False,
     )
 
 
+def ns_remap(remap, target, recursive=False, backup=False, dry_run=False):
+    return argparse.Namespace(
+        remap=str(remap),
+        target=str(target),
+        recursive=recursive,
+        backup=backup,
+        dry_run=dry_run,
+    )
+
+
 # ── Common fixtures ────────────────────────────────────────────────────────────
 
 @pytest.fixture

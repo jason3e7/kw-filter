@@ -330,6 +330,74 @@ def cmd_cleanlog(args: argparse.Namespace) -> None:
         print(f"\nDone. Removed {total_removed} line(s) / kept {total_kept} ({pct:.1f}% stripped).")
 
 
+# ── 6. REMAP ──────────────────────────────────────────────────────────────────
+
+def load_remap(path: str) -> dict[str, str]:
+    """Load remap pairs from file; format: 'original -> replacement'."""
+    mapping: dict[str, str] = {}
+    for lineno, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if " -> " not in stripped:
+            print(f"[warn] line {lineno}: invalid remap entry (expected 'A -> B'): {stripped!r}",
+                  file=sys.stderr)
+            continue
+        original, replacement = stripped.split(" -> ", 1)
+        mapping[original.strip()] = replacement.strip()
+    if not mapping:
+        print("[warn] remap file is empty", file=sys.stderr)
+    return mapping
+
+
+def cmd_remap(args: argparse.Namespace) -> None:
+    mapping = load_remap(args.remap)
+    if not mapping:
+        return
+
+    originals = sorted(mapping.keys(), key=len, reverse=True)
+    pattern = re.compile("|".join(re.escape(k) for k in originals))
+    total_changed = 0
+
+    for fpath in iter_files(args.target, args.recursive, False):
+        try:
+            original_text = fpath.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            print(f"[skip] {fpath}: {e}", file=sys.stderr)
+            continue
+
+        def replacer(m: re.Match) -> str:
+            return mapping[m.group(0)]
+
+        new_text, n = pattern.subn(replacer, original_text)
+        if n == 0:
+            continue
+
+        if args.dry_run:
+            print(f"\n{fpath}  ({n} replacement(s) would be made)")
+            for lineno, line in enumerate(original_text.splitlines(), 1):
+                if pattern.search(line):
+                    new_line = pattern.sub(replacer, line)
+                    print(f"  line {lineno:>4}  - {line.rstrip()}")
+                    print(f"           + {new_line.rstrip()}")
+            continue
+
+        if args.backup:
+            shutil.copy2(fpath, str(fpath) + ".bak")
+
+        fpath.write_text(new_text, encoding="utf-8")
+        print(f"  remapped {n:>4} value(s)  {fpath}")
+        total_changed += n
+
+    if args.dry_run:
+        return
+
+    if total_changed == 0:
+        print("No matching values found.")
+    else:
+        print(f"\nDone. Remapped {total_changed} value(s) total.")
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -392,6 +460,15 @@ def build_parser() -> argparse.ArgumentParser:
     s5.add_argument("--stats", action="store_true",
                     help="show removed/kept counts and percentage per file")
     s5.set_defaults(func=cmd_cleanlog)
+
+    # remap
+    s6 = sub.add_parser("remap", help="replace values using a remap list (e.g. real IP → dummy IP)")
+    add_common(s6, need_keywords=False)
+    s6.add_argument("--remap", required=True, metavar="FILE",
+                    help="remap list file (format: 'original -> replacement', one per line)")
+    s6.add_argument("--dry-run", action="store_true",
+                    help="preview replacements without modifying files")
+    s6.set_defaults(func=cmd_remap)
 
     return p
 

@@ -11,6 +11,7 @@ A CLI toolkit for filtering sensitive keywords from files before sending them to
 | `replace` | Replace keywords with anonymous tokens and emit a mapping table |
 | `restore` | Use the mapping table to put original values back |
 | `cleanlog` | Drop every line that contains a keyword (log sanitisation) |
+| `remap` | Replace values using an explicit mapping list (e.g. real IP → dummy IP) |
 
 Each command is fully independent and can be run on its own.
 
@@ -103,6 +104,25 @@ python3 kw_tools.py cleanlog -k keywords.txt -t app.log --backup    # keep .bak
 
 Unlike `clear` (which removes only the matched text), `cleanlog` removes the **entire line** whenever a keyword appears anywhere on it. Designed for log files where a partial redaction is not sufficient.
 
+### 6. Remap — replace with explicit values
+
+```bash
+python3 kw_tools.py remap --remap remap.txt -t ./logs -r
+python3 kw_tools.py remap --remap remap.txt -t app.log --dry-run   # preview
+python3 kw_tools.py remap --remap remap.txt -t ./logs -r --backup
+```
+
+**Remap file format** — one `original -> replacement` pair per line:
+
+```
+# remap.txt
+192.168.1.100 -> 127.0.0.1
+alice@corp.com -> user@example.com
+prod-db.internal -> test-db
+```
+
+Unlike `replace` (which generates random tokens), `remap` lets you specify the exact replacement value — useful for substituting real IPs, hostnames, or emails with plausible-looking fake values before sharing logs.
+
 ## Typical workflow
 
 ```bash
@@ -129,8 +149,9 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 | `--backup` | clear, replace, restore | Save `.bak` copy before modifying |
 | `--replacement TEXT` | clear | Fill string instead of empty (default: `""`) |
 | `-o FILE` | search | Save search results as JSON |
-| `--dry-run` | cleanlog | Preview lines to remove without modifying files |
+| `--dry-run` | cleanlog, remap | Preview changes without modifying files |
 | `--stats` | cleanlog | Show removed/kept count and percentage per file |
+| `--remap FILE` | remap | Remap list file (`original -> replacement`) |
 
 ## Running tests
 
@@ -138,7 +159,7 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 python3 -m pytest tests/ -v
 ```
 
-115 tests covering:
+135 tests covering:
 - Unit tests for all helper functions (`test_utils.py`)
 - Per-command tests with edge cases (`test_search/clear/replace/restore.py`)
 - End-to-end CLI integration tests via subprocess (`test_integration.py`)
