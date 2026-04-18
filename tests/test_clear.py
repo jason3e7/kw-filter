@@ -128,7 +128,7 @@ class TestClearMultipleFiles:
         sub.mkdir()
         (sub / "deep.txt").write_text("secret here\n", encoding="utf-8")
 
-        cmd_clear(ns_clear(kf, tmp_path, recursive=True))
+        cmd_clear(ns_clear(kf, tmp_path))
 
         assert "secret" not in (sub / "deep.txt").read_text(encoding="utf-8")
 

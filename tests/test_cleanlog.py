@@ -199,7 +199,7 @@ class TestCleanlogMultipleFiles:
         sub.mkdir()
         (sub / "deep.log").write_text("INFO  ok\nERROR bad\n", encoding="utf-8")
 
-        cmd_cleanlog(ns_cleanlog(kf, tmp_path, recursive=True))
+        cmd_cleanlog(ns_cleanlog(kf, tmp_path))
 
         lines = (sub / "deep.log").read_text(encoding="utf-8").splitlines()
         assert lines == ["INFO  ok"]

@@ -1,0 +1,21 @@
+=== Login Page Analysis ===
+URL: https://crm.acme-internal.com/login
+Scraped: 2024-01-15 09:30:00
+
+Form fields:
+  - #email     (type: email, placeholder: "Work email")
+  - #password  (type: password)
+  - #submit    (type: submit, text: "Sign In")
+  - #remember  (type: checkbox, label: "Stay signed in")
+
+Test credentials (staging env):
+  Admin : admin@acme-internal.com / Admin2024!
+  User  : bob.chen@acme.com       / UserPass123
+
+Post-login redirect: https://crm.acme-internal.com/dashboard
+
+Notes:
+  - Rate limit: 5 attempts / minute per IP
+  - Internal proxy: 10.0.1.55:8080
+  - Staging API key: sk-test-7f8d9e2a1b3c
+  - Session cookie: _crm_session (httpOnly, Secure, SameSite=Lax)

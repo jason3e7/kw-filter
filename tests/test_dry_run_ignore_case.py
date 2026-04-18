@@ -1,4 +1,4 @@
-"""Tests for --dry-run and --ignore-case/-i across all commands."""
+"""Tests for --dry-run (all commands) and always-on case-insensitive matching."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,7 +20,6 @@ def kw(tmp_path, words):
 # ══════════════════════════════════════════════════════════════════════════════
 # DRY-RUN
 # ══════════════════════════════════════════════════════════════════════════════
-
 
 class TestDryRunClear:
     def test_dry_run_does_not_modify_file(self, tmp_path):
@@ -97,127 +96,82 @@ class TestDryRunRestore:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# IGNORE-CASE
+# CASE-INSENSITIVE (always on)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestIgnoreCaseSearch:
+class TestCaseInsensitiveSearch:
     def test_matches_uppercase(self, tmp_path, capsys):
         f = tmp_path / "t.txt"
         f.write_text("HELLO world\n", encoding="utf-8")
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, ignore_case=True))
+        cmd_search(ns_search(kw(tmp_path, ["hello"]), f))
         assert "HELLO" in capsys.readouterr().out
-
-    def test_no_match_without_flag(self, tmp_path, capsys):
-        f = tmp_path / "t.txt"
-        f.write_text("HELLO world\n", encoding="utf-8")
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, ignore_case=False))
-        assert "No keywords found" in capsys.readouterr().out
 
     def test_mixed_case_match(self, tmp_path, capsys):
         f = tmp_path / "t.txt"
         f.write_text("Hello World\nhELLO again\n", encoding="utf-8")
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, ignore_case=True))
+        cmd_search(ns_search(kw(tmp_path, ["hello"]), f))
         out = capsys.readouterr().out
         assert "2 occurrence" in out
 
 
-class TestIgnoreCaseClear:
+class TestCaseInsensitiveClear:
     def test_clears_uppercase_keyword(self, tmp_path):
         f = tmp_path / "t.txt"
         f.write_text("ADMIN logged in\n", encoding="utf-8")
-        cmd_clear(ns_clear(kw(tmp_path, ["admin"]), f, ignore_case=True))
-        text = f.read_text(encoding="utf-8")
-        assert "ADMIN" not in text
-
-    def test_case_sensitive_does_not_clear(self, tmp_path):
-        f = tmp_path / "t.txt"
-        original = "ADMIN logged in\n"
-        f.write_text(original, encoding="utf-8")
-        cmd_clear(ns_clear(kw(tmp_path, ["admin"]), f, ignore_case=False))
-        assert f.read_text(encoding="utf-8") == original
+        cmd_clear(ns_clear(kw(tmp_path, ["admin"]), f))
+        assert "ADMIN" not in f.read_text(encoding="utf-8")
 
     def test_replacement_applied_to_any_case(self, tmp_path):
         f = tmp_path / "t.txt"
         f.write_text("Admin user ADMIN\n", encoding="utf-8")
-        cmd_clear(ns_clear(kw(tmp_path, ["admin"]), f,
-                           replacement="[X]", ignore_case=True))
+        cmd_clear(ns_clear(kw(tmp_path, ["admin"]), f, replacement="[X]"))
         text = f.read_text(encoding="utf-8")
         assert text.count("[X]") == 2
         assert "Admin" not in text
         assert "ADMIN" not in text
 
 
-class TestIgnoreCaseReplace:
+class TestCaseInsensitiveReplace:
     def test_same_token_for_different_cases(self, tmp_path):
         import json
         f = tmp_path / "t.txt"
         f.write_text("John john JOHN\n", encoding="utf-8")
         m = tmp_path / "mapping.json"
-        cmd_replace(ns_replace(kw(tmp_path, ["John"]), f, m, ignore_case=True))
+        cmd_replace(ns_replace(kw(tmp_path, ["John"]), f, m))
         mapping = json.loads(m.read_text(encoding="utf-8"))
-        # all three variants should map to the same token → 1 entry in mapping
         assert len(mapping) == 1
-        assert list(mapping.values())[0] == "John"  # canonical form from keyword file
-
-    def test_token_canonical_keyword_stored(self, tmp_path):
-        import json
-        f = tmp_path / "t.txt"
-        f.write_text("alice ALICE Alice\n", encoding="utf-8")
-        m = tmp_path / "mapping.json"
-        cmd_replace(ns_replace(kw(tmp_path, ["alice"]), f, m, ignore_case=True))
-        mapping = json.loads(m.read_text(encoding="utf-8"))
-        assert list(mapping.values())[0] == "alice"
+        assert list(mapping.values())[0] == "John"
 
     def test_restore_brings_back_canonical(self, tmp_path):
-        import json
         f = tmp_path / "t.txt"
         f.write_text("ALICE logged in\n", encoding="utf-8")
         m = tmp_path / "mapping.json"
-        cmd_replace(ns_replace(kw(tmp_path, ["alice"]), f, m, ignore_case=True))
-        # now restore
+        cmd_replace(ns_replace(kw(tmp_path, ["alice"]), f, m))
         cmd_restore(ns_restore(m, f))
-        text = f.read_text(encoding="utf-8")
-        # restored to canonical keyword (lowercase "alice")
-        assert "alice" in text
+        assert "alice" in f.read_text(encoding="utf-8")
 
 
-class TestIgnoreCaseCleanlog:
+class TestCaseInsensitiveCleanlog:
     def test_drops_line_with_uppercase_keyword(self, tmp_path):
         f = tmp_path / "t.txt"
         f.write_text("safe line\nSECRET data here\nanother safe\n", encoding="utf-8")
-        cmd_cleanlog(ns_cleanlog(kw(tmp_path, ["secret"]), f, ignore_case=True))
+        cmd_cleanlog(ns_cleanlog(kw(tmp_path, ["secret"]), f))
         text = f.read_text(encoding="utf-8")
         assert "SECRET" not in text
         assert "safe line" in text
         assert "another safe" in text
 
-    def test_case_sensitive_keeps_uppercase(self, tmp_path):
-        f = tmp_path / "t.txt"
-        original = "safe line\nSECRET data here\nanother safe\n"
-        f.write_text(original, encoding="utf-8")
-        cmd_cleanlog(ns_cleanlog(kw(tmp_path, ["secret"]), f, ignore_case=False))
-        assert f.read_text(encoding="utf-8") == original
 
-
-class TestIgnoreCaseRemap:
+class TestCaseInsensitiveRemap:
     def test_remaps_uppercase_key(self, tmp_path):
         rf = tmp_path / "remap.txt"
         rf.write_text("alice -> user_a\n", encoding="utf-8")
         f = tmp_path / "t.txt"
         f.write_bytes(b"login: ALICE\n")
-        cmd_remap(ns_remap(rf, f, ignore_case=True))
+        cmd_remap(ns_remap(rf, f))
         data = f.read_bytes()
         assert b"user_a" in data
         assert b"ALICE" not in data
-
-    def test_case_sensitive_does_not_remap_uppercase(self, tmp_path):
-        rf = tmp_path / "remap.txt"
-        rf.write_text("alice -> user_a\n", encoding="utf-8")
-        f = tmp_path / "t.txt"
-        original = b"login: ALICE\n"
-        f.write_bytes(original)
-        cmd_remap(ns_remap(rf, f, ignore_case=False))
-        assert f.read_bytes() == original
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -225,18 +179,16 @@ class TestIgnoreCaseRemap:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestReplaceDefaultMapping:
-    def test_mapping_default_is_mapping_json(self, tmp_path):
-        import json, os
+    def test_mapping_written(self, tmp_path):
+        import json
         f = tmp_path / "t.txt"
         f.write_text("John Doe\n", encoding="utf-8")
         m = tmp_path / "mapping.json"
         cmd_replace(ns_replace(kw(tmp_path, ["John Doe"]), f, m))
         assert m.exists()
-        mapping = json.loads(m.read_text(encoding="utf-8"))
-        assert "John Doe" in mapping.values()
+        assert "John Doe" in json.loads(m.read_text(encoding="utf-8")).values()
 
-    def test_restore_default_mapping_json(self, tmp_path):
-        import json
+    def test_restore_roundtrip(self, tmp_path):
         f = tmp_path / "t.txt"
         f.write_text("John Doe was here\n", encoding="utf-8")
         m = tmp_path / "mapping.json"

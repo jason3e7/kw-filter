@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>kw-filter — 關鍵字隱私過濾工具</title>
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #0d1f38;
+      --border:   #334155;
+      --accent:   #4ade80;
+      --blue:     #60a5fa;
+      --purple:   #c084fc;
+      --red:      #f87171;
+      --yellow:   #fbbf24;
+      --text:     #e2e8f0;
+      --muted:    #94a3b8;
+      --code:     #a5f3fc;
+      --code-bg:  #091827;
+      --mono: 'Fira Code','Cascadia Code',Consolas,monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system,'Segoe UI',sans-serif;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: -.3px; }
+    header p  { font-size: 12px; color: var(--muted); }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      flex-shrink: 0;
+      gap: 2px;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 12.5px;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      user-select: none;
+      transition: color .15s, border-color .15s;
+    }
+    .tab:hover  { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    /* ── Main layout ── */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left sidebar (controls) ── */
+    .sidebar {
+      width: 290px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sect { padding: 11px 12px; border-bottom: 1px solid var(--border); }
+    .sect label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    textarea, input[type=text] {
+      width: 100%;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.55;
+      padding: 7px 8px;
+      resize: vertical;
+      outline: none;
+      transition: border-color .15s;
+    }
+    textarea:focus, input[type=text]:focus { border-color: var(--accent); }
+    input[type=text] { resize: none; }
+
+    .run-btn {
+      margin: 10px 12px 12px;
+      padding: 9px;
+      background: var(--accent);
+      color: #0f172a;
+      border: none;
+      border-radius: 5px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      width: calc(100% - 24px);
+      transition: filter .15s;
+    }
+    .run-btn:hover { filter: brightness(1.1); }
+
+    /* ── IO area ── */
+    .io { flex: 1; display: flex; overflow: hidden; }
+    .io-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .io-pane + .io-pane { border-left: 1px solid var(--border); }
+    .io-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 11px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .io-head span { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); }
+    .io-head .btns { display: flex; gap: 5px; }
+    .btn {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn:hover { color: var(--text); border-color: var(--muted); }
+    .io-pane textarea { flex: 1; border: none; border-radius: 0; resize: none; padding: 11px 12px; font-size: 12.5px; line-height: 1.6; }
+    .io-pane textarea:focus { border-color: transparent; }
+
+    /* ── Info panel ── */
+    .info {
+      width: 230px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .info-head {
+      padding: 7px 11px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .info-body { flex: 1; overflow-y: auto; padding: 8px 10px; }
+    .op-desc { color: var(--muted); line-height: 1.65; font-size: 12px; }
+    .op-desc code { background: var(--code-bg); color: var(--code); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: 11px; }
+
+    .match-item { padding: 4px 6px; margin-bottom: 4px; background: var(--code-bg); border-radius: 3px; border-left: 2px solid var(--blue); }
+    .match-loc  { color: var(--blue); font-family: var(--mono); font-size: 11px; }
+    .match-kw   { color: var(--accent); font-weight: 600; font-size: 11px; }
+    .match-ctx  { color: var(--muted); font-size: 11px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .map-row { display: flex; gap: 5px; padding: 3px 0; border-bottom: 1px solid rgba(51,65,85,.6); font-size: 11px; align-items: flex-start; }
+    .map-tok { color: var(--blue); font-family: var(--mono); flex-shrink: 0; }
+    .map-sep { color: var(--muted); }
+    .map-val { color: var(--accent); word-break: break-all; }
+
+    .stat-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+    .stat-lbl { color: var(--muted); }
+    .stat-val { color: var(--text); font-family: var(--mono); font-weight: 600; }
+
+    .divider { height: 1px; background: var(--border); margin: 8px 0; }
+    .section-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin-bottom: 6px; }
+
+    /* ── Status bar ── */
+    #status {
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .hidden { display: none !important; }
+    code { background: var(--code-bg); color: var(--code); padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: 11px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔑 kw-filter</h1>
+  </div>
+  <p>關鍵字隱私過濾工具 — 送 AI 前先換掉敏感值，拿回回應後還原</p>
+</header>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-op="search">🔍 Search</div>
+  <div class="tab" data-op="clear">✂️ Clear</div>
+  <div class="tab" data-op="replace">🔄 Replace</div>
+  <div class="tab" data-op="restore">♻️ Restore</div>
+  <div class="tab" data-op="cleanlog">🧹 Cleanlog</div>
+  <div class="tab" data-op="remap">🗺️ Remap</div>
+</div>
+
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <div class="sect" id="kw-sect">
+      <label>Keywords（一行一個）</label>
+      <textarea id="keywords" rows="7"
+        placeholder="John Doe&#10;acme-corp.com&#10;sk-live-abc123&#10;# 以 # 開頭的行為註解"></textarea>
+    </div>
+
+    <div class="sect hidden" id="remap-sect">
+      <label>Remap 對照表（原始 → 替代）</label>
+      <textarea id="remap-pairs" rows="7"
+        placeholder="192.168.1.1 -> 127.0.0.1&#10;alice@corp.com -> user@example.com&#10;prod-db -> test-db"></textarea>
+    </div>
+
+    <div class="sect hidden" id="mapping-sect">
+      <label id="mapping-label">Mapping JSON</label>
+      <textarea id="mapping-json" rows="7"
+        placeholder='{"[[KW_XXXX]]": "John Doe"}'></textarea>
+    </div>
+
+    <div class="sect hidden" id="clear-opts">
+      <label>取代文字（留空 = 刪除）</label>
+      <input type="text" id="replacement" placeholder="[REDACTED]">
+    </div>
+
+    <button class="run-btn" onclick="process()">▶ 執行</button>
+  </div>
+
+  <!-- IO -->
+  <div class="io">
+
+    <!-- Input pane -->
+    <div class="io-pane">
+      <div class="io-head">
+        <span>INPUT</span>
+        <div class="btns">
+          <button class="btn" onclick="document.getElementById('input').value=''; status('已清除')">清除</button>
+          <button class="btn" onclick="pasteIn()">貼上</button>
+        </div>
+      </div>
+      <textarea id="input" spellcheck="false"
+        placeholder="在這裡貼上要處理的文字…"></textarea>
+    </div>
+
+    <!-- Output pane -->
+    <div class="io-pane">
+      <div class="io-head">
+        <span>OUTPUT</span>
+        <div class="btns">
+          <button class="btn" onclick="copyOut()">複製</button>
+          <button class="btn" onclick="swapIO()">⇄ 交換</button>
+        </div>
+      </div>
+      <textarea id="output" readonly spellcheck="false"
+        placeholder="結果會顯示在這裡…"></textarea>
+    </div>
+
+    <!-- Info panel -->
+    <div class="info">
+      <div class="info-head" id="info-title">說明</div>
+      <div class="info-body" id="info-body">
+        <div class="op-desc" id="op-desc"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="status">就緒</div>
+
+<script>
+// ── Utilities ───────────────────────────────────────────────────────────────
+
+function escRe(s)   { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function buildPattern(kws) {
+  const sorted = [...kws].filter(k => k.trim()).sort((a, b) => b.length - a.length);
+  if (!sorted.length) return null;
+  return new RegExp(sorted.map(escRe).join('|'), 'gi');
+}
+
+function getKeywords() {
+  return document.getElementById('keywords').value
+    .split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+}
+
+function getRemapPairs() {
+  const pairs = {};
+  document.getElementById('remap-pairs').value.split('\n').forEach(line => {
+    const s = line.trim();
+    if (!s || s.startsWith('#')) return;
+    const i = s.indexOf(' -> ');
+    if (i === -1) return;
+    pairs[s.slice(0, i).trim()] = s.slice(i + 4).trim();
+  });
+  return pairs;
+}
+
+function randHex(n) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(Math.ceil(n / 2))))
+    .map(b => b.toString(16).padStart(2, '0')).join('').slice(0, n).toUpperCase();
+}
+
+// ── Operations ──────────────────────────────────────────────────────────────
+
+function opSearch(text, kws) {
+  const pat = buildPattern(kws);
+  if (!pat) return [];
+  const results = [];
+  text.split('\n').forEach((line, li) => {
+    pat.lastIndex = 0;
+    let m;
+    while ((m = pat.exec(line)) !== null)
+      results.push({ line: li + 1, col: m.index + 1, kw: m[0], ctx: line });
+  });
+  return results;
+}
+
+function opClear(text, kws, replacement) {
+  const pat = buildPattern(kws);
+  if (!pat) return { text, count: 0 };
+  let count = 0;
+  return { text: text.replace(pat, () => { count++; return replacement; }), count };
+}
+
+function opReplace(text, kws) {
+  const pat = buildPattern(kws);
+  if (!pat) return { text, mapping: {} };
+  const canonical = {};
+  kws.forEach(k => canonical[k.toLowerCase()] = k);
+  const mapping = {}, kwToTok = {};
+  const out = text.replace(pat, m => {
+    const kw = canonical[m.toLowerCase()] || m;
+    if (kwToTok[kw]) return kwToTok[kw];
+    const tok = `[[KW_${randHex(8)}]]`;
+    kwToTok[kw] = tok; mapping[tok] = kw;
+    return tok;
+  });
+  return { text: out, mapping };
+}
+
+function opRestore(text, jsonStr) {
+  let mapping;
+  try { mapping = JSON.parse(jsonStr); } catch { return { text, error: 'JSON 格式錯誤' }; }
+  const toks = Object.keys(mapping).sort((a, b) => b.length - a.length);
+  if (!toks.length) return { text, error: 'Mapping 為空' };
+  const pat = new RegExp(toks.map(escRe).join('|'), 'g');
+  let count = 0;
+  return { text: text.replace(pat, m => { count++; return mapping[m]; }), count };
+}
+
+function opCleanlog(text, kws) {
+  const pat = buildPattern(kws);
+  if (!pat) return { text, removed: 0, kept: 0 };
+  const lines = text.split('\n');
+  const kept = []; let removed = 0;
+  lines.forEach(l => { pat.lastIndex = 0; pat.test(l) ? removed++ : kept.push(l); });
+  return { text: kept.join('\n'), removed, kept: kept.length };
+}
+
+function opRemap(text, pairs) {
+  const keys = Object.keys(pairs).sort((a, b) => b.length - a.length);
+  if (!keys.length) return { text, count: 0 };
+  const canon = {}; keys.forEach(k => canon[k.toLowerCase()] = k);
+  const pat = new RegExp(keys.map(escRe).join('|'), 'gi');
+  let count = 0;
+  return { text: text.replace(pat, m => { count++; return pairs[canon[m.toLowerCase()] || m] || m; }), count };
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+
+const OP_DESC = {
+  search:   '掃描輸入文字，列出所有關鍵字出現的行號、欄位和上下文。<br><br>不修改原文。',
+  clear:    '將所有關鍵字替換為空字串或自訂文字（例如 <code>[REDACTED]</code>）。<br><br>不可還原。',
+  replace:  '將關鍵字替換為唯一 token（<code>[[KW_XXXX]]</code>）。<br>同一關鍵字共用 token，不分大小寫。<br><br>執行後 mapping 會自動填入左欄，可用 <b>Restore</b> 還原。',
+  restore:  '讀取 mapping JSON，將 token 換回原始值。<br><br>請在左側貼上 Replace 輸出的 mapping JSON。',
+  cleanlog: '整行移除含有關鍵字的行，不留任何殘留結構。<br><br>與 Clear 的差異：Clear 只去掉關鍵字；Cleanlog 移除整行。',
+  remap:    '依照對照表將值替換為指定的假值。<br><br>格式：<code>原始值 → 替代值</code>，每行一組。<br><br>適合替換 IP、hostname、email 為無害的佔位值。',
+};
+
+let currentOp = 'search';
+
+document.getElementById('tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  currentOp = tab.dataset.op;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+  refreshUI();
+});
+
+function refreshUI() {
+  const op = currentOp;
+  const show = id => document.getElementById(id).classList.remove('hidden');
+  const hide = id => document.getElementById(id).classList.add('hidden');
+
+  // Sidebar sections
+  op === 'restore' || op === 'remap' ? hide('kw-sect')      : show('kw-sect');
+  op === 'remap'                     ? show('remap-sect')   : hide('remap-sect');
+  op === 'replace' || op === 'restore' ? show('mapping-sect'): hide('mapping-sect');
+  op === 'clear'                     ? show('clear-opts')   : hide('clear-opts');
+
+  if (op === 'replace') {
+    document.getElementById('mapping-label').textContent = 'Mapping JSON（執行後自動填入）';
+    document.getElementById('mapping-json').readOnly = true;
+    document.getElementById('mapping-json').style.color = 'var(--muted)';
+  } else if (op === 'restore') {
+    document.getElementById('mapping-label').textContent = 'Mapping JSON（貼上 Replace 的輸出）';
+    document.getElementById('mapping-json').readOnly = false;
+    document.getElementById('mapping-json').style.color = '';
+  }
+
+  document.getElementById('op-desc').innerHTML = OP_DESC[op] || '';
+  document.getElementById('info-title').textContent = '說明';
+  document.getElementById('info-body').innerHTML =
+    `<div class="op-desc" id="op-desc">${OP_DESC[op] || ''}</div>`;
+  status(`操作：${op}`);
+}
+
+function process() {
+  const text = document.getElementById('input').value;
+  const op   = currentOp;
+
+  if (!text.trim()) { status('⚠️  請先輸入文字'); return; }
+
+  let out = '', info = null;
+
+  if (op === 'search') {
+    const kws = getKeywords();
+    if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
+    const matches = opSearch(text, kws);
+    if (!matches.length) { out = '（未找到任何關鍵字）'; status('未找到關鍵字'); }
+    else {
+      out = matches.map(m => `L${m.line}:${m.col}  [${m.kw}]  ${m.ctx.trim()}`).join('\n');
+      status(`找到 ${matches.length} 個匹配`);
+      info = { type: 'matches', matches };
+    }
+
+  } else if (op === 'clear') {
+    const kws = getKeywords();
+    if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
+    const repl = document.getElementById('replacement').value;
+    const r = opClear(text, kws, repl);
+    out = r.text;
+    status(`已清除 ${r.count} 個關鍵字`);
+    info = { type: 'stats', rows: [['替換次數', r.count], ['輸出字元', r.text.length]] };
+
+  } else if (op === 'replace') {
+    const kws = getKeywords();
+    if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
+    const r = opReplace(text, kws);
+    out = r.text;
+    const mapStr = JSON.stringify(r.mapping, null, 2);
+    document.getElementById('mapping-json').value = mapStr;
+    status(`已建立 ${Object.keys(r.mapping).length} 個 token`);
+    info = { type: 'mapping', mapping: r.mapping };
+
+  } else if (op === 'restore') {
+    const mapJson = document.getElementById('mapping-json').value;
+    if (!mapJson.trim()) { status('⚠️  請貼上 mapping JSON'); return; }
+    const r = opRestore(text, mapJson);
+    if (r.error) { status('❌  ' + r.error); return; }
+    out = r.text;
+    status(`已還原 ${r.count} 個 token`);
+    info = { type: 'stats', rows: [['還原次數', r.count]] };
+
+  } else if (op === 'cleanlog') {
+    const kws = getKeywords();
+    if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
+    const r = opCleanlog(text, kws);
+    out = r.text;
+    const tot = r.removed + r.kept;
+    const pct = tot ? ((r.removed / tot) * 100).toFixed(1) : '0.0';
+    status(`移除 ${r.removed} 行，保留 ${r.kept} 行（${pct}%）`);
+    info = { type: 'stats', rows: [['移除行數', r.removed], ['保留行數', r.kept], ['移除比例', pct + '%']] };
+
+  } else if (op === 'remap') {
+    const pairs = getRemapPairs();
+    if (!Object.keys(pairs).length) { status('⚠️  請輸入對照表'); return; }
+    const r = opRemap(text, pairs);
+    out = r.text;
+    status(`已替換 ${r.count} 個值`);
+    info = { type: 'stats', rows: [['替換次數', r.count]] };
+  }
+
+  document.getElementById('output').value = out;
+  if (info) renderInfo(info);
+}
+
+function renderInfo(info) {
+  const body = document.getElementById('info-body');
+  body.innerHTML = '';
+
+  if (info.type === 'matches') {
+    const h = el('div', 'section-title'); h.textContent = `搜尋結果 (${info.matches.length})`;
+    body.appendChild(h);
+    const limit = Math.min(info.matches.length, 60);
+    info.matches.slice(0, limit).forEach(m => {
+      const d = el('div', 'match-item');
+      d.innerHTML = `<span class="match-loc">L${m.line}:${m.col}</span> <span class="match-kw">${escHtml(m.kw)}</span>` +
+                    `<span class="match-ctx">${escHtml(m.ctx.trim().slice(0, 55))}</span>`;
+      body.appendChild(d);
+    });
+    if (info.matches.length > limit) {
+      const more = el('div'); more.style.cssText = 'color:var(--muted);font-size:11px;padding:4px 0';
+      more.textContent = `…還有 ${info.matches.length - limit} 個`;
+      body.appendChild(more);
+    }
+
+  } else if (info.type === 'mapping') {
+    const h = el('div', 'section-title'); h.textContent = `Token Mapping (${Object.keys(info.mapping).length})`;
+    body.appendChild(h);
+    Object.entries(info.mapping).forEach(([tok, orig]) => {
+      const d = el('div', 'map-row');
+      d.innerHTML = `<span class="map-tok">${escHtml(tok)}</span><span class="map-sep">→</span><span class="map-val">${escHtml(orig)}</span>`;
+      body.appendChild(d);
+    });
+    const hint = el('div'); hint.style.cssText = 'color:var(--muted);font-size:11px;margin-top:8px;line-height:1.5';
+    hint.textContent = 'Mapping 已填入左欄。切換到 Restore 並貼上含 token 的 AI 回應即可還原。';
+    body.appendChild(hint);
+
+  } else if (info.type === 'stats') {
+    const h = el('div', 'section-title'); h.textContent = '統計';
+    body.appendChild(h);
+    info.rows.forEach(([lbl, val]) => {
+      const d = el('div', 'stat-row');
+      d.innerHTML = `<span class="stat-lbl">${lbl}</span><span class="stat-val">${val}</span>`;
+      body.appendChild(d);
+    });
+  }
+}
+
+function el(tag, cls) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+
+function copyOut() {
+  const t = document.getElementById('output').value;
+  if (!t) return;
+  navigator.clipboard.writeText(t).then(() => status('✅ 已複製到剪貼簿'));
+}
+
+function pasteIn() {
+  navigator.clipboard.readText()
+    .then(t => { document.getElementById('input').value = t; status('已貼上'); })
+    .catch(() => status('⚠️  請直接使用 Ctrl+V 貼上'));
+}
+
+function swapIO() {
+  const inp = document.getElementById('input');
+  const out = document.getElementById('output');
+  const tmp = inp.value; inp.value = out.value; out.value = tmp;
+  status('已交換輸入 / 輸出');
+}
+
+function status(msg) { document.getElementById('status').textContent = msg; }
+
+// Init
+refreshUI();
+</script>
+</body>
+</html>

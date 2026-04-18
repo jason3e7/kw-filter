@@ -260,7 +260,7 @@ def s01_cover(prs):
     sw = Inches(2.75); sh = Inches(1.6)
     sx = ML + Inches(0.26)
     sy = START + Inches(2.75)
-    for num, lbl in [("5","指令"), ("115","自動化測試"), ("0","第三方依賴"), ("29萬+","行/秒處理")]:
+    for num, lbl in [("6","指令"), ("160+","自動化測試"), ("0","第三方依賴"), ("29萬+","行/秒處理")]:
         stat_box(slide, sx, sy, sw, sh, num, lbl)
         sx += sw + Inches(0.29)
 
@@ -330,18 +330,19 @@ def s03_scenario(prs):
 
 def s04_commands(prs):
     slide = blank(prs)
-    heading(slide, "運作原理：5 個獨立指令")
+    heading(slide, "運作原理：6 個獨立指令")
 
     headers = ["指令", "功能說明", "主要選項"]
     rows = [
-        ["search",   "掃描目錄，列出關鍵字出現的檔案、行號、欄位",             "-r 遞迴  ·  -o FILE JSON 輸出  ·  --binary"],
-        ["clear",    "將關鍵字替換為空字串或自訂文字，不需還原的場景",          "--replacement TEXT  ·  --backup"],
-        ["replace",  "換成 [[KW_XXXX]] token，同一關鍵字共用 token，輸出 mapping.json",  "-m FILE  ·  --backup"],
-        ["restore",  "讀取 mapping.json，將 token 換回原始值",                "-m FILE  ·  --backup"],
-        ["cleanlog", "整行刪除含關鍵字的行，不留殘留結構（新功能）",            "--dry-run 預覽  ·  --stats 統計"],
+        ["search",   "掃描目錄，列出關鍵字出現的檔案、行號、欄位（不分大小寫）", "-o FILE JSON 輸出  ·  --binary"],
+        ["clear",    "將關鍵字替換為空字串或自訂文字，不需還原的場景",             "--replacement TEXT  ·  --dry-run  ·  --backup"],
+        ["replace",  "換成 [[KW_XXXX]] token，同一關鍵字共用 token，輸出 mapping.json",  "-m FILE  ·  --dry-run  ·  --backup"],
+        ["restore",  "讀取 mapping.json，將 token 換回原始值",                    "-m FILE  ·  --dry-run  ·  --backup"],
+        ["cleanlog", "整行刪除含關鍵字的行，不留殘留結構",                        "--dry-run 預覽  ·  --stats 統計"],
+        ["remap",    "依對照表替換值（IP / hostname / email → 假值），支援 binary 檔",  "--remap FILE  ·  --dry-run  ·  --backup"],
     ]
     table(slide, ML, BODY_TOP, CW, [1.2, 3.3, 2.7],
-          headers, rows, row_h=Inches(0.52))
+          headers, rows, row_h=Inches(0.48))
 
     flow_items = [
         ("📄 原始檔案", False, WHITE), ("→", False, MUTED),
@@ -351,7 +352,7 @@ def s04_commands(prs):
         ("restore",    True,  ACCENT), ("→", False, MUTED),
         ("✅ 還原",    False, WHITE),
     ]
-    fy = BODY_TOP + Inches(0.52 * 6) + Inches(0.35)
+    fy = BODY_TOP + Inches(0.48 * 7) + Inches(0.3)
     flow_row(slide, flow_items, ML + Inches(0.5), fy)
 
 
@@ -533,38 +534,111 @@ def s08_cleanlog(prs):
     code_block(slide, R, BODY_TOP + Inches(3.35), HW, Inches(1.35), cmd)
 
 
+def s08b_playwright(prs):
+    slide = blank(prs)
+    heading(slide, "案例五：爬蟲資料 + Playwright 自動化測試生成")
+
+    ty = BODY_TOP
+    txtbox(slide, ML, ty, HW, Inches(0.32), "情境", size=Pt(15), color=ACCENT, bold=True)
+    ty += Inches(0.36)
+    txtbox(slide, ML, ty, HW, Inches(0.44),
+           "QA 工程師用爬蟲抓取內部 CRM 的登入頁，想請 AI 直接產生 Playwright E2E 測試腳本，但爬蟲輸出含有：",
+           size=Pt(14), color=WHITE)
+    ty += Inches(0.48)
+
+    for b in ["測試帳號密碼（admin@acme-internal.com / Admin2024!）",
+              "內部服務 URL（crm.acme-internal.com）",
+              "Staging API Key（sk-test-7f8d9e2a1b3c）",
+              "內網 IP / Proxy（10.0.1.55:8080）"]:
+        txtbox(slide, ML + Inches(0.2), ty, HW, Inches(0.32),
+               "•  " + b, size=Pt(13), color=WHITE)
+        ty += Inches(0.32)
+
+    ty += Inches(0.1)
+    txtbox(slide, ML, ty, HW, Inches(0.32), "Workflow", size=Pt(15), color=ACCENT, bold=True)
+    ty += Inches(0.35)
+
+    for step in ["① replace  — 敏感值換成 token，存 mapping.json",
+                 "② 將 token 化的爬蟲輸出送給 AI",
+                 "③ AI 產出含 token 的 Playwright 程式碼",
+                 "④ restore  — token 換回真實值，腳本可直接執行"]:
+        shape = rect(slide, ML, ty, HW, Inches(0.42))
+        tf = shape.text_frame
+        _set_txbody_margins(tf._txBody, l=Pt(10), t=Pt(5), anchor='ctr')
+        p = tf.paragraphs[0]
+        run = p.add_run(); run.text = step
+        run.font.size = Pt(13); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
+        ty += Inches(0.46)
+
+    # Right column — before / after code
+    token_out = ("# 爬蟲輸出（replace 後）\n"
+                 "URL: https://crm.[[KW_A1B2C3D4]]/login\n"
+                 "Admin: [[KW_E5F6A7B8]] / [[KW_C9D0E1F2]]\n"
+                 "Proxy: [[KW_11223344]]:8080\n"
+                 "Key:   [[KW_55667788]]")
+
+    ai_code =  ("// AI 產出（含 token）\n"
+                "await page.goto(\n"
+                "  'https://crm.[[KW_A1B2C3D4]]/login');\n"
+                "await page.fill('#email',\n"
+                "  '[[KW_E5F6A7B8]]');\n"
+                "await page.fill('#password',\n"
+                "  '[[KW_C9D0E1F2]]');\n"
+                "await page.click('#submit');")
+
+    final_code = ("// restore 後（可直接執行）\n"
+                  "await page.goto(\n"
+                  "  'https://crm.acme-internal.com/login');\n"
+                  "await page.fill('#email',\n"
+                  "  'admin@acme-internal.com');\n"
+                  "await page.fill('#password',\n"
+                  "  'Admin2024!');\n"
+                  "await page.click('#submit');")
+
+    code_block(slide, R, BODY_TOP,               HW, Inches(1.65), token_out,  "① replace 輸出",  label_color=WARN)
+    code_block(slide, R, BODY_TOP + Inches(1.8),  HW, Inches(2.1),  ai_code,    "③ AI 回傳（token）", label_color=MUTED)
+    code_block(slide, R, BODY_TOP + Inches(4.05), HW, Inches(2.1),  final_code, "④ restore 後",    label_color=ACCENT)
+
+
 def s09_tests(prs):
     slide = blank(prs)
     heading(slide, "驗證一：自動化測試覆蓋")
 
     headers = ["測試模組", "數量", "涵蓋面向"]
     rows = [
-        ["test_utils.py",       "27",  "工具函式、Regex 編譯、Binary search"],
-        ["test_search.py",      "16",  "搜尋、多檔案、遞迴、Unicode、JSON 輸出"],
-        ["test_clear.py",       "14",  "清空、自訂替換文字、backup、多檔"],
-        ["test_replace.py",     "16",  "Token 格式、穩定性、最長關鍵字優先"],
-        ["test_restore.py",     "16",  "還原、Roundtrip、錯誤處理"],
-        ["test_cleanlog.py",    "22",  "整行刪除、dry-run、stats、Unicode"],
-        ["test_integration.py", "14",  "CLI subprocess 端對端測試"],
-        ["合計",                "115", ""],
+        ["test_utils.py",              "27",  "工具函式、Regex 編譯、Binary search"],
+        ["test_search.py",             "16",  "搜尋、多檔案、遞迴、Unicode、JSON 輸出"],
+        ["test_clear.py",              "14",  "清空、自訂替換文字、backup、多檔"],
+        ["test_replace.py",            "16",  "Token 格式、穩定性、最長關鍵字優先"],
+        ["test_restore.py",            "16",  "還原、Roundtrip、錯誤處理"],
+        ["test_cleanlog.py",           "22",  "整行刪除、dry-run、stats、Unicode"],
+        ["test_remap.py",              "20",  "Binary 模式替換、dry-run、Unicode"],
+        ["test_dry_run_ignore_case.py","15",  "dry-run（各指令）、大小寫不分"],
+        ["test_playwright_scenario.py", "7",  "爬蟲 → replace → AI → restore 端對端"],
+        ["test_integration.py",        "14",  "CLI subprocess 端對端測試"],
+        ["合計",                       "167", ""],
     ]
     table(slide, ML, BODY_TOP, HW + Inches(0.3), [2.1, 0.65, 3.5],
           headers, rows, row_h=Inches(0.48))
 
     pytest_out = ("$ python3 -m pytest tests/ -v\n\n"
-                  "tests/test_utils.py          ✓ 27 passed\n"
-                  "tests/test_search.py         ✓ 16 passed\n"
-                  "tests/test_clear.py          ✓ 14 passed\n"
-                  "tests/test_replace.py        ✓ 16 passed\n"
-                  "tests/test_restore.py        ✓ 16 passed\n"
-                  "tests/test_cleanlog.py       ✓ 22 passed\n"
-                  "tests/test_integration.py    ✓ 14 passed\n\n"
-                  "======= 115 passed in 1.77s =======")
+                  "tests/test_utils.py               ✓ 27\n"
+                  "tests/test_search.py              ✓ 16\n"
+                  "tests/test_clear.py               ✓ 14\n"
+                  "tests/test_replace.py             ✓ 16\n"
+                  "tests/test_restore.py             ✓ 16\n"
+                  "tests/test_cleanlog.py            ✓ 22\n"
+                  "tests/test_remap.py               ✓ 20\n"
+                  "tests/test_dry_run_ignore_case.py ✓ 15\n"
+                  "tests/test_playwright_scenario.py ✓  7\n"
+                  "tests/test_integration.py         ✓ 14\n\n"
+                  "======= 167 passed in 2.1s =======")
     code_block(slide, R + Inches(0.15), BODY_TOP, HW - Inches(0.15), Inches(3.45), pytest_out)
 
-    card(slide, R + Inches(0.15), BODY_TOP + Inches(3.6), HW - Inches(0.15), Inches(0.88),
-         body="Roundtrip 測試（test_restore.py）：replace → restore 後逐字元比對，確保原始內容 100% 還原。",
-         border=ACCENT, body_size=Pt(14))
+    card(slide, R + Inches(0.15), BODY_TOP + Inches(3.6), HW - Inches(0.15), Inches(1.22),
+         body=("Roundtrip 測試（test_restore.py）：replace → restore 後逐字元比對，確保原始內容 100% 還原。\n\n"
+               "Playwright 情境測試（test_playwright_scenario.py）：模擬爬蟲→AI→還原完整流程，驗證無 token 殘留。"),
+         border=ACCENT, body_size=Pt(13))
 
 
 def s10_perf(prs):
@@ -668,7 +742,7 @@ def s13_why(prs):
         ("🔁 無損還原",             "token 化後 AI 的回應同樣包含 token，執行 restore 後完整還原，無需手動替換。"),
         ("📋 可稽核、可合規",       "mapping.json 是明確的處理紀錄，可作為 GDPR / 個資法去識別化處理的文件佐證。"),
         ("🧩 適合任何 AI 服務",     "不綁定特定 AI。ChatGPT、Claude、Gemini、本地 LLM 都適用——就是純文字替換。"),
-        ("🧪 115 個測試保證品質",   "涵蓋 edge case：Unicode、多檔案、最長優先、Roundtrip 完整還原驗證、log 整行清理。"),
+        ("🧪 160+ 個測試保證品質",  "涵蓋 edge case：Unicode、多檔案、最長優先、Roundtrip 還原、Playwright 情境 E2E。"),
     ]
     ch = Inches(1.62)
     cx_l, cx_r = ML, R
@@ -692,10 +766,12 @@ def s14_quickstart(prs):
     # run_cmd: 4 lines → 0.3 + (68+18)pt = 0.3 + 1.19" = 1.49" → use 1.55"
     install = "git clone https://github.com/jason3e7/kw-filter.git\ncd kw-filter"
     kw_file = "# keywords.txt\nJohn Doe\nacme-corp.com\nsk-live-abc123"
-    run_cmd = ("python3 kw_tools.py search   -k kw.txt -t ./docs -r\n"
-               "python3 kw_tools.py replace  -k kw.txt -t ./docs -r -m map.json\n"
-               "python3 kw_tools.py restore  -m map.json -t ./ai_output -r\n"
-               "python3 kw_tools.py cleanlog -k kw.txt -t ./logs -r --stats")
+    run_cmd = ("# 遞迴 + 大小寫不分均為預設，無需額外參數\n"
+               "python3 kw_tools.py search   -k kw.txt -t ./docs\n"
+               "python3 kw_tools.py replace  -k kw.txt -t ./docs\n"
+               "python3 kw_tools.py restore  -t ./ai_output\n"
+               "python3 kw_tools.py cleanlog -k kw.txt -t ./logs --stats\n"
+               "python3 kw_tools.py remap    --remap remap.txt -t ./logs")
 
     code_block(slide, ML, BODY_TOP,                HW, Inches(1.05), install, "安裝")
     code_block(slide, ML, BODY_TOP + Inches(1.17), HW, Inches(1.55), kw_file, "建立關鍵字清單")
@@ -716,12 +792,12 @@ def s14_quickstart(prs):
     rt.text = "重點回顧"; rt.font.size = Pt(15); rt.font.bold = True
     rt.font.color.rgb = ACCENT; rt.font.name = "Noto Sans TC"
 
-    for item in ["5 個獨立 CLI 指令，各自可單獨執行",
-                 "關鍵字清單完全由你掌控",
+    for item in ["6 個獨立 CLI 指令 + HTML 互動工具",
+                 "遞迴 & 大小寫不分均為預設行為",
                  "replace → restore  100% 還原",
                  "10 萬行在 0.34 秒 內處理完畢",
-                 "115 個測試，零第三方依賴",
-                 "cleanlog：log 整行清理，含 dry-run 預覽"]:
+                 "160+ 個測試，零第三方依賴",
+                 "Playwright 情境：爬蟲 → AI → 可執行腳本"]:
         p = tf.add_paragraph(); p.space_before = Pt(5)
         p.alignment = PP_ALIGN.LEFT
         run = p.add_run(); run.text = "▸  " + item
@@ -793,6 +869,7 @@ def main():
     s06_case2(prs)
     s07_case3(prs)
     s08_cleanlog(prs)
+    s08b_playwright(prs)
     s09_tests(prs)
     s10_perf(prs)
     s11_correctness(prs)

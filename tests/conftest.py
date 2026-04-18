@@ -13,76 +13,60 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # ── Namespace builders ─────────────────────────────────────────────────────────
 
-def ns_search(keywords, target, recursive=True, binary=False, output=None,
-              ignore_case=True):
+def ns_search(keywords, target, binary=False, output=None):
     return argparse.Namespace(
         keywords=str(keywords),
         target=str(target),
-        recursive=recursive,
         binary=binary,
         output=output,
-        ignore_case=ignore_case,
     )
 
 
-def ns_clear(keywords, target, recursive=True, backup=False, replacement="",
-             dry_run=False, ignore_case=True):
+def ns_clear(keywords, target, backup=False, replacement="", dry_run=False):
     return argparse.Namespace(
         keywords=str(keywords),
         target=str(target),
-        recursive=recursive,
         backup=backup,
         replacement=replacement,
         dry_run=dry_run,
-        ignore_case=ignore_case,
     )
 
 
-def ns_replace(keywords, target, mapping="mapping.json", recursive=True,
-               backup=False, dry_run=False, ignore_case=True):
+def ns_replace(keywords, target, mapping="mapping.json", backup=False, dry_run=False):
     return argparse.Namespace(
         keywords=str(keywords),
         target=str(target),
         mapping=str(mapping),
-        recursive=recursive,
-        backup=backup,
-        dry_run=dry_run,
-        ignore_case=ignore_case,
-    )
-
-
-def ns_restore(mapping, target, recursive=True, backup=False, dry_run=False):
-    return argparse.Namespace(
-        mapping=str(mapping),
-        target=str(target),
-        recursive=recursive,
         backup=backup,
         dry_run=dry_run,
     )
 
 
-def ns_cleanlog(keywords, target, recursive=True, backup=False,
-                dry_run=False, stats=False, ignore_case=True):
+def ns_restore(mapping, target, backup=False, dry_run=False):
+    return argparse.Namespace(
+        mapping=str(mapping),
+        target=str(target),
+        backup=backup,
+        dry_run=dry_run,
+    )
+
+
+def ns_cleanlog(keywords, target, backup=False, dry_run=False, stats=False):
     return argparse.Namespace(
         keywords=str(keywords),
         target=str(target),
-        recursive=recursive,
         backup=backup,
         dry_run=dry_run,
         stats=stats,
-        ignore_case=ignore_case,
     )
 
 
-def ns_remap(remap, target, recursive=True, backup=False, dry_run=False,
-             ignore_case=True):
+def ns_remap(remap, target, backup=False, dry_run=False):
     return argparse.Namespace(
         remap=str(remap),
         target=str(target),
-        recursive=recursive,
         backup=backup,
         dry_run=dry_run,
-        ignore_case=ignore_case,
     )
 
 

@@ -47,17 +47,17 @@ def workspace(tmp_path):
 class TestCLISearch:
     def test_search_exits_zero(self, workspace):
         run("search", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r")
+            "-t", str(workspace / "data"))
 
     def test_search_output_contains_keyword(self, workspace):
         r = run("search", "-k", str(workspace / "keywords.txt"),
-                "-t", str(workspace / "data"), "-r")
+                "-t", str(workspace / "data"))
         assert "John Doe" in r.stdout
 
     def test_search_json_output(self, workspace):
         out_json = workspace / "results.json"
         run("search", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r",
+            "-t", str(workspace / "data"),
             "-o", str(out_json))
         assert out_json.exists()
         data = json.loads(out_json.read_text())
@@ -75,7 +75,7 @@ class TestCLISearch:
 class TestCLIClear:
     def test_clear_removes_keywords(self, workspace):
         run("clear", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r")
+            "-t", str(workspace / "data"))
 
         text = (workspace / "data" / "report.txt").read_text(encoding="utf-8")
         assert "John Doe" not in text
@@ -83,7 +83,7 @@ class TestCLIClear:
 
     def test_clear_with_replacement(self, workspace):
         run("clear", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r",
+            "-t", str(workspace / "data"),
             "--replacement", "[REMOVED]")
 
         text = (workspace / "data" / "report.txt").read_text(encoding="utf-8")
@@ -91,7 +91,7 @@ class TestCLIClear:
 
     def test_clear_backup(self, workspace):
         run("clear", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r", "--backup")
+            "-t", str(workspace / "data"), "--backup")
 
         assert (workspace / "data" / "report.txt.bak").exists()
 
@@ -100,7 +100,7 @@ class TestCLIReplace:
     def test_replace_creates_mapping(self, workspace):
         mp = workspace / "mapping.json"
         run("replace", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r",
+            "-t", str(workspace / "data"),
             "-m", str(mp))
 
         assert mp.exists()
@@ -111,7 +111,7 @@ class TestCLIReplace:
     def test_replace_tokenises_files(self, workspace):
         mp = workspace / "mapping.json"
         run("replace", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r",
+            "-t", str(workspace / "data"),
             "-m", str(mp))
 
         text = (workspace / "data" / "report.txt").read_text(encoding="utf-8")
@@ -129,9 +129,9 @@ class TestCLIRestore:
         }
 
         run("replace", "-k", str(workspace / "keywords.txt"),
-            "-t", str(workspace / "data"), "-r", "-m", str(mp))
+            "-t", str(workspace / "data"), "-m", str(mp))
         run("restore", "-m", str(mp),
-            "-t", str(workspace / "data"), "-r")
+            "-t", str(workspace / "data"))
 
         for name, original in originals.items():
             restored = (workspace / "data" / name).read_text(encoding="utf-8")

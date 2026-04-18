@@ -100,22 +100,22 @@ class TestSearchRecursive:
         (sub / "deep.txt").write_text("needle found here\n", encoding="utf-8")
         (data_dir / "top.txt").write_text("nothing\n", encoding="utf-8")
 
-        cmd_search(ns_search(kf, data_dir, recursive=True))
+        cmd_search(ns_search(kf, data_dir))
 
         out = capsys.readouterr().out
         assert "deep.txt" in out
         assert "1 occurrence(s)" in out
 
-    def test_non_recursive_skips_subdirs(self, kw_file, data_dir, capsys):
+    def test_always_recurses_into_subdirs(self, kw_file, data_dir, capsys):
         kf = kw_file(["needle"])
         sub = data_dir / "subdir"
         sub.mkdir()
         (sub / "deep.txt").write_text("needle found here\n", encoding="utf-8")
 
-        cmd_search(ns_search(kf, data_dir, recursive=False))
+        cmd_search(ns_search(kf, data_dir))
 
         out = capsys.readouterr().out
-        assert "No keywords found" in out
+        assert "deep.txt" in out
 
 
 class TestSearchUnicode:

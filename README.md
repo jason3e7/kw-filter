@@ -42,9 +42,10 @@ secret_token_xyz
 ### 1. Search — find occurrences
 
 ```bash
-python3 kw_tools.py search -k keywords.txt -t ./data -r
-python3 kw_tools.py search -k keywords.txt -t ./data -r -i   # case-insensitive
+python3 kw_tools.py search -k keywords.txt -t ./data
 ```
+
+Recursion and case-insensitive matching are always on — no flags needed.
 
 Output:
 ```
@@ -159,13 +160,13 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 |---|---|---|
 | `-k FILE` | search, clear, replace, cleanlog | Keyword list file |
 | `-t PATH` | all | Target file or directory |
-| `-r` / `--no-r` | all | Recurse into subdirectories (default: on) |
+| *(always recursive)* | all | Subdirectory recursion is always enabled |
 | `-m FILE` | replace, restore | Mapping table JSON path (default: `mapping.json`) |
 | `--backup` | clear, replace, restore, remap | Save `.bak` copy before modifying |
 | `--replacement TEXT` | clear | Fill string instead of empty (default: `""`) |
 | `-o FILE` | search | Save search results as JSON |
 | `--dry-run` | clear, replace, restore, cleanlog, remap | Preview changes without modifying files |
-| `-i` / `--no-i` | search, clear, replace, cleanlog, remap | Case-insensitive matching (default: on) |
+| *(always ignore-case)* | search, clear, replace, cleanlog, remap | Case-insensitive matching is always enabled |
 | `--stats` | cleanlog | Show removed/kept count and percentage per file |
 | `--remap FILE` | remap | Remap list file (`original -> replacement`) |
 
@@ -175,7 +176,7 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 python3 -m pytest tests/ -v
 ```
 
-161 tests covering:
+160+ tests covering:
 - Unit tests for all helper functions (`test_utils.py`)
 - Per-command tests with edge cases (`test_search/clear/replace/restore/remap/cleanlog.py`)
 - Cross-command tests for `--dry-run` and `-i/--ignore-case` (`test_dry_run_ignore_case.py`)

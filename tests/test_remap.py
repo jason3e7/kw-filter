@@ -206,7 +206,7 @@ class TestRemapMultiFile:
         sub = tmp_path / "sub"
         sub.mkdir()
         (sub / "deep.log").write_text("value: OLD\n", encoding="utf-8")
-        cmd_remap(ns_remap(rf, tmp_path, recursive=True))
+        cmd_remap(ns_remap(rf, tmp_path))
         assert "NEW" in (sub / "deep.log").read_text()
 
 

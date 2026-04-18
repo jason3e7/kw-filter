@@ -142,7 +142,7 @@ class TestRestoreMultipleFiles:
         sub.mkdir()
         (sub / "deep.txt").write_text("[[KW_AABBCCDD]]\n", encoding="utf-8")
 
-        cmd_restore(ns_restore(mp, tmp_path, recursive=True))
+        cmd_restore(ns_restore(mp, tmp_path))
 
         assert (sub / "deep.txt").read_text(encoding="utf-8") == "Alice\n"
 

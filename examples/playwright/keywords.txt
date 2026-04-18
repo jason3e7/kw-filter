@@ -1,0 +1,8 @@
+# Sensitive values to filter before sending to AI
+admin@acme-internal.com
+Admin2024!
+bob.chen@acme.com
+UserPass123
+acme-internal.com
+10.0.1.55
+sk-test-7f8d9e2a1b3c

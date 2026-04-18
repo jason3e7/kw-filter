@@ -100,10 +100,10 @@ def cmd_search(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords, getattr(args, "ignore_case", False))
+    pattern = build_pattern(keywords, True)
     matches: list[Match] = []
 
-    for fpath in iter_files(args.target, args.recursive, args.binary):
+    for fpath in iter_files(args.target, True, args.binary):
         try:
             text = fpath.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
@@ -156,12 +156,12 @@ def cmd_clear(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords, getattr(args, "ignore_case", False))
+    pattern = build_pattern(keywords, True)
     replacement = args.replacement  # default ""
     dry_run = getattr(args, "dry_run", False)
 
     changed = 0
-    for fpath in iter_files(args.target, args.recursive, False):
+    for fpath in iter_files(args.target, True, False):
         try:
             original = fpath.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
@@ -201,18 +201,16 @@ def cmd_replace(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    ignore_case = getattr(args, "ignore_case", False)
     dry_run = getattr(args, "dry_run", False)
-    pattern = build_pattern(keywords, ignore_case)
+    pattern = build_pattern(keywords, True)
     mapping: dict[str, str] = {}   # token -> canonical keyword
     changed_files = 0
 
-    # Build canonical form lookup for ignore_case: lowered -> original
-    canonical: dict[str, str] = {kw.lower(): kw for kw in keywords} if ignore_case else {}
+    canonical: dict[str, str] = {kw.lower(): kw for kw in keywords}
 
     def make_token(matched: str) -> str:
         """Return a stable token per unique canonical keyword."""
-        keyword = canonical.get(matched.lower(), matched) if ignore_case else matched
+        keyword = canonical.get(matched.lower(), matched)
         for tok, kw in mapping.items():
             if kw == keyword:
                 return tok
@@ -220,7 +218,7 @@ def cmd_replace(args: argparse.Namespace) -> None:
         mapping[token] = keyword
         return token
 
-    for fpath in iter_files(args.target, args.recursive, False):
+    for fpath in iter_files(args.target, True, False):
         try:
             original = fpath.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
@@ -280,7 +278,7 @@ def cmd_restore(args: argparse.Namespace) -> None:
     token_pattern = re.compile("|".join(re.escape(t) for t in mapping))
     changed_files = 0
 
-    for fpath in iter_files(args.target, args.recursive, False):
+    for fpath in iter_files(args.target, True, False):
         try:
             original = fpath.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
@@ -323,11 +321,11 @@ def cmd_cleanlog(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords, getattr(args, "ignore_case", False))
+    pattern = build_pattern(keywords, True)
     total_removed = 0
     total_kept = 0
 
-    for fpath in iter_files(args.target, args.recursive, False):
+    for fpath in iter_files(args.target, True, False):
         try:
             original = fpath.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
@@ -400,19 +398,12 @@ def cmd_remap(args: argparse.Namespace) -> None:
     if not mapping:
         return
 
-    ignore_case = getattr(args, "ignore_case", False)
     originals = sorted(mapping.keys(), key=len, reverse=True)
-    flags = re.IGNORECASE if ignore_case else 0
-    pattern = re.compile(b"|".join(re.escape(k.encode()) for k in originals), flags)
-
-    # Build bytes mapping; for ignore_case keys are lowered bytes
-    if ignore_case:
-        bytes_mapping = {k.lower().encode(): v.encode() for k, v in mapping.items()}
-    else:
-        bytes_mapping = {k.encode(): v.encode() for k, v in mapping.items()}
+    pattern = re.compile(b"|".join(re.escape(k.encode()) for k in originals), re.IGNORECASE)
+    bytes_mapping = {k.lower().encode(): v.encode() for k, v in mapping.items()}
     total_changed = 0
 
-    for fpath in iter_files(args.target, args.recursive, True):
+    for fpath in iter_files(args.target, True, True):
         try:
             original_bytes = fpath.read_bytes()
         except OSError as e:
@@ -420,8 +411,7 @@ def cmd_remap(args: argparse.Namespace) -> None:
             continue
 
         def replacer(m: re.Match) -> bytes:
-            key = m.group(0).lower() if ignore_case else m.group(0)
-            return bytes_mapping[key]
+            return bytes_mapping[m.group(0).lower()]
 
         new_bytes, n = pattern.subn(replacer, original_bytes)
         if n == 0:
@@ -464,32 +454,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     # shared flags
     def add_common(sp, need_keywords=True, need_target=True, need_backup=True,
-                   need_dry_run=False, need_ignore_case=False):
+                   need_dry_run=False):
         if need_keywords:
             sp.add_argument("-k", "--keywords", required=True,
                             metavar="FILE", help="keyword list file (one per line)")
         if need_target:
             sp.add_argument("-t", "--target", required=True,
                             metavar="PATH", help="file or directory to process")
-            sp.add_argument("-r", dest="recursive", action="store_true", default=True,
-                            help="recurse into subdirectories (default: on)")
-            sp.add_argument("--no-r", dest="recursive", action="store_false",
-                            help="disable recursive")
         if need_backup:
             sp.add_argument("--backup", action="store_true",
                             help="save .bak copy before modifying each file")
         if need_dry_run:
             sp.add_argument("--dry-run", action="store_true",
                             help="preview changes without modifying files")
-        if need_ignore_case:
-            sp.add_argument("-i", dest="ignore_case", action="store_true", default=True,
-                            help="case-insensitive matching (default: on)")
-            sp.add_argument("--no-i", dest="ignore_case", action="store_false",
-                            help="case-sensitive matching")
 
     # search
     s1 = sub.add_parser("search", help="find all keyword occurrences")
-    add_common(s1, need_backup=False, need_ignore_case=True)
+    add_common(s1, need_backup=False)
     s1.add_argument("--binary", action="store_true",
                     help="also search binary files")
     s1.add_argument("-o", "--output", metavar="JSON",
@@ -498,14 +479,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # clear
     s2 = sub.add_parser("clear", help="erase keywords from files")
-    add_common(s2, need_dry_run=True, need_ignore_case=True)
+    add_common(s2, need_dry_run=True)
     s2.add_argument("--replacement", default="",
                     help="string to replace keywords with (default: empty)")
     s2.set_defaults(func=cmd_clear)
 
     # replace
     s3 = sub.add_parser("replace", help="replace keywords with tokens")
-    add_common(s3, need_dry_run=True, need_ignore_case=True)
+    add_common(s3, need_dry_run=True)
     s3.add_argument("-m", "--mapping", default="mapping.json",
                     metavar="JSON", help="output mapping table path (default: mapping.json)")
     s3.set_defaults(func=cmd_replace)
@@ -519,7 +500,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # cleanlog
     s5 = sub.add_parser("cleanlog", help="drop every line containing a keyword")
-    add_common(s5, need_ignore_case=True)
+    add_common(s5)
     s5.add_argument("--dry-run", action="store_true",
                     help="preview which lines would be removed without modifying files")
     s5.add_argument("--stats", action="store_true",
@@ -528,7 +509,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # remap
     s6 = sub.add_parser("remap", help="replace values using a remap list (e.g. real IP → dummy IP)")
-    add_common(s6, need_keywords=False, need_ignore_case=True)
+    add_common(s6, need_keywords=False)
     s6.add_argument("--remap", required=True, metavar="FILE",
                     help="remap list file (format: 'original -> replacement', one per line)")
     s6.add_argument("--dry-run", action="store_true",
