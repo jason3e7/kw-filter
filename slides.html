@@ -11,9 +11,10 @@
   :root {
     --accent: #4ade80;
     --danger: #f87171;
-    --warn: #fbbf24;
-    --blue: #60a5fa;
-    --muted: #94a3b8;
+    --warn:   #fbbf24;
+    --blue:   #60a5fa;
+    --purple: #c084fc;
+    --muted:  #94a3b8;
   }
 
   .reveal { font-family: 'Segoe UI', 'Noto Sans TC', sans-serif; }
@@ -23,25 +24,24 @@
   .reveal h3 { font-size: 1.05em; color: var(--accent); margin-bottom: 0.3em; }
   .reveal p, .reveal li { font-size: 0.78em; line-height: 1.7; }
   .reveal section { text-align: left; }
-  .reveal .title-section { text-align: center; }
+  .reveal .center-section { text-align: center; }
 
-  /* tag pills */
   .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; vertical-align: middle; }
   .tag-danger  { background: #7f1d1d; color: var(--danger); }
   .tag-warn    { background: #78350f; color: var(--warn); }
   .tag-ok      { background: #14532d; color: var(--accent); }
   .tag-blue    { background: #1e3a5f; color: var(--blue); }
 
-  /* cards */
   .cards { display: grid; gap: 0.8em; }
   .cards-2 { grid-template-columns: 1fr 1fr; }
   .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
   .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1em 1.2em; }
-  .card-danger { border-color: var(--danger); }
-  .card-ok     { border-color: var(--accent); }
-  .card-blue   { border-color: var(--blue); }
+  .card-danger  { border-color: var(--danger); }
+  .card-ok      { border-color: var(--accent); }
+  .card-blue    { border-color: var(--blue); }
+  .card-purple  { border-color: var(--purple); }
+  .card-warn    { border-color: var(--warn); }
 
-  /* code comparison */
   .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
   .compare-label { font-size: 0.55em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4em; }
   .label-bad  { color: var(--danger); }
@@ -50,33 +50,41 @@
   .reveal pre { font-size: 0.62em; border-radius: 8px; margin: 0; box-shadow: none; }
   .reveal pre code { max-height: 340px; padding: 0.8em 1em; }
 
-  /* stat boxes */
   .stats { display: flex; gap: 1em; justify-content: center; }
   .stat { text-align: center; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1em 1.6em; }
   .stat-num { font-size: 2.2em; font-weight: 800; color: var(--accent); line-height: 1; }
   .stat-label { font-size: 0.55em; color: var(--muted); margin-top: 0.3em; text-transform: uppercase; letter-spacing: 0.06em; }
 
-  /* flow */
   .flow { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; }
   .flow-step { background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: 0.5em 0.9em; font-size: 0.65em; white-space: nowrap; }
   .flow-step strong { color: var(--accent); }
   .flow-arrow { color: var(--muted); font-size: 1em; }
 
-  /* table */
   .reveal table { font-size: 0.68em; width: 100%; }
   .reveal table th { background: #1e293b; color: var(--accent); padding: 0.5em 0.8em; }
   .reveal table td { padding: 0.4em 0.8em; border-bottom: 1px solid #1e293b; }
   .reveal table tr:nth-child(even) td { background: #0f172a; }
 
-  .highlight { color: var(--accent); font-weight: 700; }
+  .highlight  { color: var(--accent); font-weight: 700; }
+  .hi-purple  { color: var(--purple); font-weight: 700; }
   .muted { color: var(--muted); }
-  .center { text-align: center; }
   .mt { margin-top: 0.6em; }
 
-  /* cmd badge */
   .cmd { display: inline-block; background: #0f172a; border: 1px solid #334155; border-radius: 5px; padding: 1px 7px; font-family: monospace; font-size: 0.85em; color: var(--blue); }
+  .cmd-purple { color: var(--purple) !important; }
 
   .footer-note { position: absolute; bottom: 0.6em; right: 1.2em; font-size: 0.42em; color: #475569; }
+
+  /* ── Big Question slide ─────────────────────────────────────── */
+  .bq-section { background: radial-gradient(ellipse at 60% 40%, #1a0533 0%, #0a0a14 70%) !important; }
+  .bq-quote { font-size: 1.5em; font-weight: 700; color: #e2e8f0; line-height: 1.5; text-align: center; margin: 0.5em auto; max-width: 860px; }
+  .bq-quote em { color: var(--purple); font-style: normal; }
+  .bq-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9em; margin-top: 1.2em; }
+  .bq-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(192,132,252,0.25); border-radius: 12px; padding: 1em 1.2em; }
+  .bq-card h3 { color: var(--purple); font-size: 0.9em; }
+  .bq-card p  { color: #cbd5e1; font-size: 0.7em; line-height: 1.6; margin: 0; }
+  .bq-divider { width: 60px; height: 3px; background: linear-gradient(90deg, var(--purple), transparent); border-radius: 2px; margin: 1em auto; }
+  .bq-sub { font-size: 0.65em; color: var(--muted); text-align: center; margin-top: 1em; }
 </style>
 </head>
 <body>
@@ -84,7 +92,7 @@
 <div class="slides">
 
 <!-- ─── 1. COVER ─────────────────────────────────────────────── -->
-<section class="title-section">
+<section class="center-section">
   <div style="margin-top:1.5em">
     <div style="font-size:0.65em;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.6em">Open Source · Python · Zero Dependencies</div>
     <h1 style="font-size:2.6em;margin-bottom:0.2em">kw-filter</h1>
@@ -92,8 +100,8 @@
     <p style="font-size:0.7em;color:var(--muted);margin-top:0.3em">在資料送給 AI 之前，先把敏感關鍵字換掉；拿回答案之後，再還原回來。</p>
   </div>
   <div class="stats" style="margin-top:2em">
-    <div class="stat"><div class="stat-num">4</div><div class="stat-label">獨立指令</div></div>
-    <div class="stat"><div class="stat-num">93</div><div class="stat-label">自動化測試</div></div>
+    <div class="stat"><div class="stat-num">5</div><div class="stat-label">獨立指令</div></div>
+    <div class="stat"><div class="stat-num">115</div><div class="stat-label">自動化測試</div></div>
     <div class="stat"><div class="stat-num">0</div><div class="stat-label">第三方依賴</div></div>
     <div class="stat"><div class="stat-num">29萬+</div><div class="stat-label">行/秒 處理速度</div></div>
   </div>
@@ -167,28 +175,32 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
   <p class="mt" style="color:var(--muted)">AI 仍然能理解程式碼結構、提供重構建議——但不會看到任何真實的機密值。</p>
 </section>
 
-<!-- ─── 4. HOW IT WORKS ──────────────────────────────────────── -->
+<!-- ─── 4. HOW IT WORKS — 5 COMMANDS ────────────────────────── -->
 <section>
-  <h2>運作原理：4 個獨立指令</h2>
-  <div class="cards cards-2" style="margin-top:0.5em">
+  <h2>運作原理：5 個獨立指令</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7em;margin-top:0.5em">
     <div class="card card-blue">
-      <h3><span class="cmd">search</span>  &nbsp;先偵查</h3>
-      <p>掃描目標目錄，列出每個關鍵字出現在哪個檔案、第幾行第幾欄。支援遞迴、JSON 輸出。</p>
+      <h3><span class="cmd">search</span> &nbsp;先偵查</h3>
+      <p>掃描目錄，列出每個關鍵字出現的檔案、行號、欄位。支援遞迴與 JSON 輸出。</p>
     </div>
     <div class="card card-blue">
-      <h3><span class="cmd">clear</span>  &nbsp;直接清空</h3>
-      <p>將關鍵字替換為空字串（或自訂文字），適合不需要還原的場景。支援 <code>--backup</code>。</p>
+      <h3><span class="cmd">clear</span> &nbsp;直接清空</h3>
+      <p>將關鍵字替換為空字串（或自訂文字）。適合不需要還原的場景。</p>
     </div>
     <div class="card card-ok">
-      <h3><span class="cmd">replace</span>  &nbsp;換成 token</h3>
-      <p>每個關鍵字換成唯一的 <code>[[KW_XXXXXXXX]]</code>，同一關鍵字跨檔案共用同一 token，並輸出 mapping.json。</p>
+      <h3><span class="cmd">replace</span> &nbsp;換成 token</h3>
+      <p>每個關鍵字換成 <code>[[KW_XXXXXXXX]]</code>，同一關鍵字跨檔案共用同一 token，輸出 mapping.json。</p>
     </div>
     <div class="card card-ok">
-      <h3><span class="cmd">restore</span>  &nbsp;還原</h3>
+      <h3><span class="cmd">restore</span> &nbsp;還原</h3>
       <p>讀取 mapping.json，將所有 token 換回原始值。不需要原始關鍵字清單。</p>
     </div>
+    <div class="card card-purple">
+      <h3><span class="cmd cmd-purple">cleanlog</span> &nbsp;清理日誌</h3>
+      <p>整行刪除：只要該行任何位置含有關鍵字，整行移除。有 <code>--dry-run</code> 預覽與 <code>--stats</code> 統計。</p>
+    </div>
   </div>
-  <div class="flow" style="margin-top:1em">
+  <div class="flow" style="margin-top:0.9em">
     <div class="flow-step">📄 原始檔案</div>
     <div class="flow-arrow">→</div>
     <div class="flow-step"><strong>replace</strong></div>
@@ -230,7 +242,7 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
 生效日期：2024-03-01</code></pre>
     </div>
   </div>
-  <p class="mt" style="color:var(--muted);font-size:0.65em">AI 仍能摘要條款結構、義務事項、違約責任——機密數值完全遮蔽。</p>
+  <p class="mt muted" style="font-size:0.65em">AI 仍能摘要條款結構、義務事項、違約責任——機密數值完全遮蔽。</p>
 </section>
 
 <!-- ─── 6. USE CASE 2 ────────────────────────────────────────── -->
@@ -247,7 +259,6 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
         <li>員工姓名寫在 TODO 裡</li>
       </ul>
       <h3 class="mt">執行方式</h3>
-      <div style="margin-top:0.4em">
       <pre><code class="language-bash"># 1. 先確認哪些地方有問題
 python3 kw_tools.py search \
   -k secrets.txt -t ./src -r
@@ -261,7 +272,6 @@ python3 kw_tools.py replace \
 # 4. 拿回重構結果後還原
 python3 kw_tools.py restore \
   -m mapping.json -t ./refactored -r</code></pre>
-      </div>
     </div>
     <div>
       <h3>效果</h3>
@@ -324,7 +334,53 @@ ORD-2024-</code></pre>
   </div>
 </section>
 
-<!-- ─── 8. VALIDATION — TESTS ────────────────────────────────── -->
+<!-- ─── 8. USE CASE 4 — CLEANLOG (NEW) ───────────────────────── -->
+<section>
+  <h2>案例四：系統日誌清理 <span class="hi-purple">（新功能）</span></h2>
+  <div class="cards cards-2">
+    <div>
+      <h3>情境</h3>
+      <p>DevOps 工程師需要把 production log 送給 AI 找出異常模式，但日誌中夾雜：</p>
+      <ul>
+        <li>用戶 Email / 帳號 ID</li>
+        <li>IP 位址（內部拓樸資訊）</li>
+        <li>含機密值的 debug 行（<code>token=xxx</code>）</li>
+        <li>認證錯誤行（含嘗試的密碼明文）</li>
+      </ul>
+      <p class="mt">這類日誌「部分遮蔽」不夠——只要含有機密，整行都需要移除。</p>
+      <div class="card card-purple" style="margin-top:0.7em">
+        <h3 style="margin-top:0">cleanlog 與 clear 的差異</h3>
+        <p style="margin:0"><code>clear</code>：<code>token=<strong>secret</strong></code> → <code>token=</code>（殘留結構）<br>
+        <span class="hi-purple">cleanlog</span>：整行刪除，不留任何痕跡</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-label label-bad">原始 log（含機密）</div>
+      <pre><code class="language-text">10:00:01 INFO  Server started
+10:00:05 INFO  Login: alice@corp.com
+10:01:22 ERROR Auth fail: secret_token invalid
+10:01:23 INFO  Retry connection...
+10:02:00 ERROR Timeout on 192.168.1.100
+10:02:01 INFO  Connection restored
+10:03:10 DEBUG token=sk-live-abc123 cached</code></pre>
+      <div class="compare-label label-good mt">cleanlog 處理後</div>
+      <pre><code class="language-text">10:00:01 INFO  Server started
+10:01:23 INFO  Retry connection...
+10:02:01 INFO  Connection restored</code></pre>
+      <pre style="margin-top:0.5em"><code class="language-bash"># --dry-run 先預覽，再執行
+python3 kw_tools.py cleanlog \
+  -k keywords.txt -t ./logs -r \
+  --dry-run
+# → 4 line(s) would be removed
+
+python3 kw_tools.py cleanlog \
+  -k keywords.txt -t ./logs -r --stats
+# → 4 removed / 3 kept (57.1%)</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ─── 9. VALIDATION — TESTS ────────────────────────────────── -->
 <section>
   <h2>驗證一：自動化測試覆蓋</h2>
   <div class="cards cards-2" style="margin-top:0.5em">
@@ -337,7 +393,9 @@ ORD-2024-</code></pre>
           <tr><td><code>test_clear.py</code></td><td>14</td><td>清空、自訂替換字、backup、多檔</td></tr>
           <tr><td><code>test_replace.py</code></td><td>16</td><td>Token 格式、穩定性、最長關鍵字優先</td></tr>
           <tr><td><code>test_restore.py</code></td><td>16</td><td>還原、Roundtrip、錯誤處理</td></tr>
+          <tr><td><code>test_cleanlog.py</code></td><td>22</td><td>整行刪除、dry-run、stats、Unicode、真實 log 格式</td></tr>
           <tr><td><code>test_integration.py</code></td><td>14</td><td>CLI subprocess 端對端測試</td></tr>
+          <tr style="font-weight:700"><td>合計</td><td style="color:var(--accent)">115</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -349,9 +407,10 @@ tests/test_search.py         ✓ 16 passed
 tests/test_clear.py          ✓ 14 passed
 tests/test_replace.py        ✓ 16 passed
 tests/test_restore.py        ✓ 16 passed
+tests/test_cleanlog.py       ✓ 22 passed
 tests/test_integration.py    ✓ 14 passed
 
-========= 93 passed in 1.65s =========</code></pre>
+======= 115 passed in 1.77s =======</code></pre>
       <div class="card card-ok" style="margin-top:0.7em">
         <p style="margin:0"><strong>Roundtrip 測試</strong>（test_restore.py）：replace → restore 後逐字元比對，確保原始內容 100% 還原。</p>
       </div>
@@ -359,7 +418,7 @@ tests/test_integration.py    ✓ 14 passed
   </div>
 </section>
 
-<!-- ─── 9. VALIDATION — PERFORMANCE ─────────────────────────── -->
+<!-- ─── 10. VALIDATION — PERFORMANCE ─────────────────────────── -->
 <section>
   <h2>驗證二：效能實測</h2>
   <div class="stats" style="margin-top:0.8em">
@@ -373,7 +432,7 @@ tests/test_integration.py    ✓ 14 passed
     </div>
     <div class="stat">
       <div class="stat-num">1</div>
-      <div class="stat-label">Regex 編譯次數（不重複編譯）</div>
+      <div class="stat-label">Regex 編譯次數</div>
     </div>
   </div>
   <div class="cards cards-2" style="margin-top:0.9em">
@@ -399,13 +458,13 @@ tests/test_integration.py    ✓ 14 passed
   </div>
 </section>
 
-<!-- ─── 10. VALIDATION — CORRECTNESS ─────────────────────────── -->
+<!-- ─── 11. VALIDATION — CORRECTNESS ─────────────────────────── -->
 <section>
   <h2>驗證三：正確性保證</h2>
   <div class="cards cards-3">
     <div class="card card-ok">
       <h3>最長優先</h3>
-      <p>關鍵字 <code>John</code> 和 <code>John Doe</code> 同時存在時，<code>John Doe</code> 優先被匹配，<code>John</code> 不會拆分它。</p>
+      <p>關鍵字 <code>John</code> 和 <code>John Doe</code> 同時存在時，<code>John Doe</code> 優先被匹配。</p>
       <pre style="margin-top:0.5em;font-size:0.75em"><code class="language-text">Input:  John Doe was here
 Output: [[KW_AAAA]] was here
 ✓ 只有 1 個 token（非 2 個）</code></pre>
@@ -432,7 +491,7 @@ restore → 作者：張三 ✓</code></pre>
   </div>
 </section>
 
-<!-- ─── 11. COMPARISON ───────────────────────────────────────── -->
+<!-- ─── 12. COMPARISON ───────────────────────────────────────── -->
 <section>
   <h2>與現有方案比較</h2>
   <table>
@@ -452,8 +511,8 @@ restore → 作者：張三 ✓</code></pre>
         <td><span class="tag tag-ok">零依賴</span></td>
         <td>✅ mapping.json</td>
         <td>✅ 完全自訂</td>
-        <td>✅ 4 個指令</td>
-        <td>任意文字檔、程式碼</td>
+        <td>✅ 5 個指令</td>
+        <td>文字檔、程式碼、日誌</td>
       </tr>
       <tr>
         <td>Microsoft Presidio</td>
@@ -492,7 +551,7 @@ restore → 作者：張三 ✓</code></pre>
   <p class="mt muted">kw-filter 定位：<strong class="highlight">輕量、可還原、自訂度高</strong>，適合開發者和小型團隊快速整合到現有 workflow。</p>
 </section>
 
-<!-- ─── 12. WHY USE THIS ──────────────────────────────────────── -->
+<!-- ─── 13. WHY USE THIS ──────────────────────────────────────── -->
 <section>
   <h2>為什麼選擇 kw-filter？</h2>
   <div class="cards cards-2">
@@ -520,14 +579,14 @@ restore → 作者：張三 ✓</code></pre>
         <p>不綁定特定 AI。ChatGPT、Claude、Gemini、本地 LLM 都適用——就是純文字替換。</p>
       </div>
       <div class="card card-ok">
-        <h3>🧪 93 個測試保證品質</h3>
-        <p>涵蓋 edge case：Unicode、多檔案、最長優先、Roundtrip 完整還原驗證。</p>
+        <h3>🧪 115 個測試保證品質</h3>
+        <p>涵蓋 edge case：Unicode、多檔案、最長優先、Roundtrip 完整還原驗證、log 整行清理。</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ─── 13. QUICKSTART ───────────────────────────────────────── -->
+<!-- ─── 14. QUICKSTART ───────────────────────────────────────── -->
 <section>
   <h2>立刻開始使用</h2>
   <div class="cards cards-2">
@@ -541,16 +600,14 @@ John Doe
 acme-corp.com
 sk-live-abc123</code></pre>
       <h3 class="mt">執行</h3>
-      <pre><code class="language-bash"># 掃描確認
-python3 kw_tools.py search -k keywords.txt -t ./docs -r
-
+      <pre><code class="language-bash"># 偵查
+python3 kw_tools.py search  -k keywords.txt -t ./docs -r
 # 替換 + 送 AI
-python3 kw_tools.py replace -k keywords.txt \
-  -t ./docs -r -m mapping.json
-
+python3 kw_tools.py replace -k keywords.txt -t ./docs -r -m mapping.json
 # 還原 AI 回應
-python3 kw_tools.py restore -m mapping.json \
-  -t ./ai_output -r</code></pre>
+python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
+# 清理日誌整行
+python3 kw_tools.py cleanlog -k keywords.txt -t ./logs -r --stats</code></pre>
     </div>
     <div>
       <h3>執行測試</h3>
@@ -559,16 +616,53 @@ python3 -m pytest tests/ -v</code></pre>
       <div class="card" style="margin-top:0.8em;background:#0f1f12;border-color:var(--accent)">
         <h3 style="margin-top:0">重點回顧</h3>
         <ul>
-          <li>4 個獨立 CLI 指令，各自可單獨執行</li>
+          <li><strong>5</strong> 個獨立 CLI 指令，各自可單獨執行</li>
           <li>關鍵字清單完全由你掌控</li>
           <li>replace → restore <strong>100% 還原</strong></li>
           <li>10 萬行在 <strong>0.34 秒</strong>內處理完畢</li>
-          <li>93 個測試，零第三方依賴</li>
+          <li><strong>115</strong> 個測試，零第三方依賴</li>
+          <li><span class="hi-purple">cleanlog</span> 新功能：log 整行清理，含 dry-run 預覽</li>
         </ul>
       </div>
     </div>
   </div>
   <div class="footer-note">github.com/YOUR/kw-filter</div>
+</section>
+
+<!-- ─── 15. BIG QUESTION ─────────────────────────────────────── -->
+<section class="bq-section center-section">
+  <div style="padding-top:0.8em">
+    <div style="font-size:0.6em;letter-spacing:0.2em;text-transform:uppercase;color:var(--purple);margin-bottom:0.6em">大哉問</div>
+    <div class="bq-quote">
+      AI 讓我們隨時隨地都能工作，<br>
+      但我們真的準備好<em>隨時隨地都在工作</em>了嗎？
+    </div>
+    <div class="bq-divider"></div>
+  </div>
+
+  <div class="bq-cards">
+    <div class="bq-card">
+      <h3>🌙 工作侵入生活</h3>
+      <p>AI 讓凌晨兩點整理報告變得「輕鬆」。<br>輕鬆完成，不等於<em>應該</em>完成。<br><br>工具降低了摩擦，卻也模糊了「下班」這條線。</p>
+    </div>
+    <div class="bq-card">
+      <h3>🧠 決策疲勞轉移</h3>
+      <p>AI 接管了大量判斷，但「要不要用 AI 做這件事」本身就是一個新的判斷負擔。<br><br>我們節省了時間，卻多了焦慮。</p>
+    </div>
+    <div class="bq-card">
+      <h3>🪞 效率 ≠ 意義</h3>
+      <p>把一份報告從 4 小時壓縮成 20 分鐘——<br>那多出來的 3 小時 40 分鐘，你用來做什麼？<br><br>還是直接開始做下一件事？</p>
+    </div>
+  </div>
+
+  <div class="bq-sub">
+    幾個沒有標準答案的問題，帶著走——
+    <br>
+    <span style="color:#e2e8f0;font-size:1.1em">
+      你願意為自己設定一個「不用 AI」的時段嗎？&nbsp;·&nbsp;
+      你的邊界，是工具決定的，還是你自己決定的？
+    </span>
+  </div>
 </section>
 
 </div><!-- /slides -->
