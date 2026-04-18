@@ -1,26 +1,29 @@
 """
-Integration test: scraper output → keyword filtering → AI Playwright generation.
+Integration test: post-login HTML → keyword filtering → AI Playwright generation.
 
 Scenario
 --------
-A QA engineer scrapes an internal login page to collect form structure, test
-credentials, and environment details. Before handing the data to an AI (to
-generate a Playwright test), all sensitive values are tokenised with kw-filter.
-The AI writes Playwright code using the safe tokens. kw-filter then restores
-the originals so the final script is ready to run.
+A QA engineer logs into an internal CRM and saves the dashboard HTML for
+reference. The HTML contains real customer PII (names, emails, phone numbers),
+internal hostnames, an API key, and a session token embedded in a <script>.
+
+Before handing the HTML to an AI (to generate a Playwright test that navigates
+the dashboard), all sensitive values are tokenised with kw-filter.  The AI
+writes Playwright code using the safe tokens.  kw-filter then restores the
+originals so the final script is ready to run against the real environment.
 
 Workflow
 --------
-1. scrape_output.txt  (contains real credentials / IPs)
+1. dashboard.html   (post-login HTML — contains real PII / credentials)
         │
         ▼  kw-filter replace
-2. scrape_tokenised.txt  ([[KW_XXXX]] everywhere)
+2. dashboard_tokenised.html  ([[KW_XXXX]] everywhere)
         │
         ▼  send to AI (simulated here by _ai_generate_playwright)
-3. playwright_tokens.py  (Playwright code with tokens)
+3. playwright_tokens.ts  (Playwright code with tokens)
         │
         ▼  kw-filter restore
-4. playwright_final.py  (working script with real values)
+4. playwright_final.ts  (working script with real values)
 """
 from __future__ import annotations
 
@@ -37,199 +40,291 @@ from conftest import ns_replace, ns_restore
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-SCRAPE_OUTPUT = """\
-=== Login Page Analysis ===
-URL: https://crm.acme-internal.com/login
-Scraped: 2024-01-15 09:30:00
+DASHBOARD_HTML = """\
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8"><title>CRM Dashboard — Acme Corp</title></head>
+<body>
+  <header>
+    <span id="current-user">alice.wu@acme-corp.internal</span>
+    <span id="api-key" style="display:none">sk-prod-4f8e2a7b9c1d3e5f</span>
+    <a href="https://crm.acme-corp.internal/logout">Logout</a>
+  </header>
 
-Form fields:
-  - #email     (type: email, placeholder: "Work email")
-  - #password  (type: password)
-  - #submit    (type: submit, text: "Sign In")
+  <section id="customer-list">
+    <table id="tbl-customers">
+      <tbody>
+        <tr data-id="C001">
+          <td>王大明</td>
+          <td>wang.daming@gmail.com</td>
+          <td>0912-345-678</td>
+          <td><button data-action="edit" data-id="C001">編輯</button></td>
+        </tr>
+        <tr data-id="C002">
+          <td>李小華</td>
+          <td>lisa.hua@outlook.com</td>
+          <td>0978-901-234</td>
+          <td><button data-action="edit" data-id="C002">編輯</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
 
-Test credentials (staging env):
-  Admin : admin@acme-internal.com / Admin2024!
-  User  : bob.chen@acme.com       / UserPass123
-
-Post-login redirect: https://crm.acme-internal.com/dashboard
-
-Notes:
-  - Rate limit: 5 attempts / minute per IP
-  - Internal proxy: 10.0.1.55:8080
-  - Staging API key: sk-test-7f8d9e2a1b3c
+  <script>
+    const SESSION_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024";
+    const BASE_URL = "https://api.acme-corp.internal:8443/v2";
+  </script>
+</body>
+</html>
 """
 
 KEYWORDS = """\
-admin@acme-internal.com
-Admin2024!
-bob.chen@acme.com
-UserPass123
-acme-internal.com
-10.0.1.55
-sk-test-7f8d9e2a1b3c
+alice.wu@acme-corp.internal
+wang.daming@gmail.com
+0912-345-678
+lisa.hua@outlook.com
+0978-901-234
+acme-corp.internal
+sk-prod-4f8e2a7b9c1d3e5f
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024
 """
 
+# Values that must NEVER appear in any tokenised output sent to AI
 SENSITIVE_VALUES = [
-    "admin@acme-internal.com",
-    "Admin2024!",
-    "bob.chen@acme.com",
-    "UserPass123",
-    "acme-internal.com",
-    "10.0.1.55",
-    "sk-test-7f8d9e2a1b3c",
+    "alice.wu@acme-corp.internal",
+    "wang.daming@gmail.com",
+    "0912-345-678",
+    "lisa.hua@outlook.com",
+    "0978-901-234",
+    "acme-corp.internal",
+    "sk-prod-4f8e2a7b9c1d3e5f",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024",
 ]
 
 
-def _ai_generate_playwright(tokenised_context: str) -> str:
-    """Simulate what an AI returns when given the tokenised scraper output.
+def _ai_generate_playwright(tokenised_html: str) -> str:
+    """Simulate what an AI returns when given tokenised dashboard HTML.
 
-    In a real workflow this would be an API call to Claude / GPT.  Here we
-    hard-code a realistic Playwright script that references every token that
-    appeared in the input, so the test can verify end-to-end restore.
+    In production this would be an API call to Claude / GPT.  Here we
+    hard-code a realistic Playwright TypeScript test that references every
+    token found in the tokenised input so the test can verify end-to-end restore.
     """
-    # Extract tokens from the context so the simulated AI uses the exact
-    # tokens produced by this specific replace run (token values are random).
-    tokens = re.findall(r'\[\[KW_[0-9A-F]{8}\]\]', tokenised_context)
+    tokens = re.findall(r'\[\[KW_[0-9A-F]{8}\]\]', tokenised_html)
     unique_tokens = list(dict.fromkeys(tokens))   # preserve order, deduplicate
 
-    # Map positional tokens to role names so generated code is readable.
-    # The replace command processes keywords in longest-first order, so the
-    # token assignment order follows keyword length descending.
+    # Build a lookup so generated code is readable regardless of token order
     t = {i: tok for i, tok in enumerate(unique_tokens)}
+    # Keyword list (longest-first) determines assignment order:
+    # 0: alice.wu@acme-corp.internal (longest email containing the domain)
+    # 1: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024 (JWT session token)
+    # 2: wang.daming@gmail.com
+    # 3: lisa.hua@outlook.com
+    # 4: sk-prod-4f8e2a7b9c1d3e5f (API key)
+    # 5: acme-corp.internal (domain suffix matched inside the longer tokens above)
+    # 6: 0912-345-678
+    # 7: 0978-901-234
+
+    def tok(i: int) -> str:
+        return t.get(i, f'[[MISSING_{i}]]')
 
     lines = [
         "import { test, expect } from '@playwright/test';",
         "",
-        "test('admin login and dashboard redirect', async ({ page }) => {",
-        f"  await page.goto('https://crm.{t.get(4, '[TOKEN_DOMAIN]')}/login');",
+        "// Generated by AI from tokenised CRM dashboard HTML",
+        f"const BASE_URL = 'https://crm.{tok(5)}/dashboard';",
+        f"const SESSION   = '{tok(1)}';",
+        f"const API_KEY   = '{tok(4)}';",
         "",
-        f"  // Fill admin credentials",
-        f"  await page.fill('#email',    '{t.get(0, '[TOKEN_EMAIL]')}');",
-        f"  await page.fill('#password', '{t.get(1, '[TOKEN_PASS]')}');",
-        "  await page.click('#submit');",
+        "test.use({{",
+        f"  storageState: {{ cookies: [], origins: [] }},",
+        "}});",
         "",
-        f"  await expect(page).toHaveURL('https://crm.{t.get(4, '[TOKEN_DOMAIN]')}/dashboard');",
+        "test('customer list renders correct rows', async ({ page }) => {",
+        f"  await page.goto(BASE_URL);",
+        "",
+        "  // Verify logged-in user indicator",
+        f"  await expect(page.locator('#current-user'))",
+        f"    .toHaveText('{tok(0)}');",
+        "",
+        "  // Verify first customer row",
+        f"  const row1 = page.locator('[data-id=\"C001\"]');",
+        f"  await expect(row1.locator('td').nth(1)).toHaveText('{tok(2)}');",
+        f"  await expect(row1.locator('td').nth(2)).toHaveText('{tok(6)}');",
+        "",
+        "  // Verify second customer row",
+        f"  const row2 = page.locator('[data-id=\"C002\"]');",
+        f"  await expect(row2.locator('td').nth(1)).toHaveText('{tok(3)}');",
+        f"  await expect(row2.locator('td').nth(3)).toHaveText('{tok(7)}');",
         "});",
         "",
-        "test('regular user login', async ({ page }) => {",
-        f"  await page.goto('https://crm.{t.get(4, '[TOKEN_DOMAIN]')}/login');",
-        f"  await page.fill('#email',    '{t.get(2, '[TOKEN_EMAIL2]')}');",
-        f"  await page.fill('#password', '{t.get(3, '[TOKEN_PASS2]')}');",
-        "  await page.click('#submit');",
-        "",
-        f"  await expect(page).toHaveURL('https://crm.{t.get(4, '[TOKEN_DOMAIN]')}/dashboard');",
+        "test('edit button triggers API call with correct auth', async ({ page }) => {",
+        f"  await page.goto(BASE_URL);",
+        f"  const [req] = await Promise.all([",
+        f"    page.waitForRequest(r => r.url().includes('{tok(5)}')),",
+        f"    page.locator('[data-id=\"C001\"] button').click(),",
+        f"  ]);",
+        f"  expect(req.headers()['authorization']).toBe(`Bearer {tok(1)}`);",
         "});",
-        "",
-        "// Config",
-        f"// API key: {t.get(6, '[TOKEN_KEY]')}",
-        f"// Proxy:   {t.get(5, '[TOKEN_IP]')}:8080",
     ]
     return "\n".join(lines) + "\n"
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-class TestPlaywrightWorkflow:
+class TestDashboardHtmlWorkflow:
+    """Unit-level tests for each step of the replace → AI → restore pipeline."""
+
     def _setup(self, tmp_path):
-        scrape = tmp_path / "scrape_output.txt"
-        scrape.write_text(SCRAPE_OUTPUT, encoding="utf-8")
+        html = tmp_path / "dashboard.html"
+        html.write_text(DASHBOARD_HTML, encoding="utf-8")
         kw = tmp_path / "keywords.txt"
         kw.write_text(KEYWORDS, encoding="utf-8")
         mapping = tmp_path / "mapping.json"
-        return scrape, kw, mapping
+        return html, kw, mapping
 
     def test_step1_replace_removes_all_sensitive_values(self, tmp_path):
-        scrape, kw, mapping = self._setup(tmp_path)
-        cmd_replace(ns_replace(kw, scrape, mapping))
-        tokenised = scrape.read_text(encoding="utf-8")
+        """After replace, no sensitive value should remain in the HTML."""
+        html, kw, mapping = self._setup(tmp_path)
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
         for val in SENSITIVE_VALUES:
-            assert val.lower() not in tokenised.lower(), \
+            assert val.lower() not in tokenised.lower(), (
                 f"Sensitive value still present after replace: {val!r}"
+            )
+
+    def test_step1_tokens_injected(self, tmp_path):
+        """replace must inject [[KW_...]] tokens into the HTML."""
+        html, kw, mapping = self._setup(tmp_path)
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
         assert "[[KW_" in tokenised
 
     def test_step1_mapping_contains_all_keywords(self, tmp_path):
-        scrape, kw, mapping = self._setup(tmp_path)
-        cmd_replace(ns_replace(kw, scrape, mapping))
+        """mapping.json must contain every keyword from the keyword list."""
+        html, kw, mapping = self._setup(tmp_path)
+        cmd_replace(ns_replace(kw, html, mapping))
         m = json.loads(mapping.read_text(encoding="utf-8"))
         canonical_values = {v.lower() for v in m.values()}
         for val in SENSITIVE_VALUES:
-            assert val.lower() in canonical_values, \
+            assert val.lower() in canonical_values, (
                 f"Keyword missing from mapping: {val!r}"
+            )
 
-    def test_step2_ai_output_uses_tokens(self, tmp_path):
-        scrape, kw, mapping = self._setup(tmp_path)
-        cmd_replace(ns_replace(kw, scrape, mapping))
-        tokenised = scrape.read_text(encoding="utf-8")
+    def test_step2_ai_output_contains_only_tokens(self, tmp_path):
+        """AI-generated Playwright code must not contain any sensitive value."""
+        html, kw, mapping = self._setup(tmp_path)
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
 
         pw_code = _ai_generate_playwright(tokenised)
-        assert "[[KW_" in pw_code, "AI output should contain tokens"
+        assert "[[KW_" in pw_code, "AI output should reference tokens"
         for val in SENSITIVE_VALUES:
-            assert val.lower() not in pw_code.lower(), \
-                f"Real value leaked into AI output: {val!r}"
+            assert val.lower() not in pw_code.lower(), (
+                f"Sensitive value leaked into AI output: {val!r}"
+            )
 
     def test_step3_restore_recovers_real_values(self, tmp_path):
-        scrape, kw, mapping = self._setup(tmp_path)
-        cmd_replace(ns_replace(kw, scrape, mapping))
-        tokenised = scrape.read_text(encoding="utf-8")
+        """After restore, the Playwright file must contain real values and no tokens."""
+        html, kw, mapping = self._setup(tmp_path)
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
 
-        pw_tokens = tmp_path / "test_login_tokens.ts"
+        pw_tokens = tmp_path / "test_dashboard.ts"
         pw_tokens.write_text(_ai_generate_playwright(tokenised), encoding="utf-8")
 
         cmd_restore(ns_restore(mapping, pw_tokens))
         restored = pw_tokens.read_text(encoding="utf-8")
 
-        assert "acme-internal.com" in restored
-        assert "admin@acme-internal.com" in restored
-        assert "Admin2024!" in restored
-        assert "[[KW_" not in restored
+        assert "acme-corp.internal" in restored
+        assert "alice.wu@acme-corp.internal" in restored
+        assert "wang.daming@gmail.com" in restored
+        assert "sk-prod-4f8e2a7b9c1d3e5f" in restored
+        assert "[[KW_" not in restored, "No tokens should remain after restore"
+
+    def test_step3_session_token_restored(self, tmp_path):
+        """JWT session token must survive the full replace → restore cycle."""
+        html, kw, mapping = self._setup(tmp_path)
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
+
+        pw_tokens = tmp_path / "test_session.ts"
+        pw_tokens.write_text(_ai_generate_playwright(tokenised), encoding="utf-8")
+        cmd_restore(ns_restore(mapping, pw_tokens))
+
+        restored = pw_tokens.read_text(encoding="utf-8")
+        assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024" in restored
+
+    def test_full_roundtrip_html_unchanged(self, tmp_path):
+        """Replace then restore on the original HTML must yield the exact original."""
+        html, kw, mapping = self._setup(tmp_path)
+        original = html.read_text(encoding="utf-8")
+
+        cmd_replace(ns_replace(kw, html, mapping))
+        assert html.read_text(encoding="utf-8") != original   # tokens inserted
+
+        cmd_restore(ns_restore(mapping, html))
+        assert html.read_text(encoding="utf-8") == original   # perfectly restored
 
     def test_full_roundtrip_no_token_leakage(self, tmp_path):
-        """Complete workflow: original scrape content is fully reconstructed."""
-        scrape, kw, mapping = self._setup(tmp_path)
-        original_scrape = scrape.read_text(encoding="utf-8")
+        """End-to-end: no [[KW_...]] token should appear in the final Playwright file."""
+        html, kw, mapping = self._setup(tmp_path)
 
-        # Replace
-        cmd_replace(ns_replace(kw, scrape, mapping))
-        tokenised = scrape.read_text(encoding="utf-8")
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
 
-        # Simulate AI step
         pw_tokens = tmp_path / "pw.ts"
         pw_tokens.write_text(_ai_generate_playwright(tokenised), encoding="utf-8")
 
-        # Restore AI output
         cmd_restore(ns_restore(mapping, pw_tokens))
         final = pw_tokens.read_text(encoding="utf-8")
 
-        # No tokens left anywhere
         assert "[[KW_" not in final
-        # Restore the original scrape to verify mapping is correct
-        cmd_restore(ns_restore(mapping, scrape))
-        assert scrape.read_text(encoding="utf-8") == original_scrape
+        for val in SENSITIVE_VALUES:
+            # Real values must be back
+            if val in DASHBOARD_HTML:
+                assert val in final or val.lower() in final.lower()
 
 
-class TestPlaywrightExampleFiles:
+class TestDashboardExampleFiles:
     """Verify the committed example files work with the full workflow."""
 
     EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "playwright"
 
     def test_example_files_exist(self):
         assert (self.EXAMPLES_DIR / "keywords.txt").exists()
-        assert (self.EXAMPLES_DIR / "scrape_output.txt").exists()
+        assert (self.EXAMPLES_DIR / "dashboard.html").exists()
+
+    def test_example_html_contains_expected_pii(self):
+        """Sanity-check: example HTML must contain the sensitive values we claim to filter."""
+        html = (self.EXAMPLES_DIR / "dashboard.html").read_text(encoding="utf-8")
+        for val in [
+            "alice.wu@acme-corp.internal",
+            "wang.daming@gmail.com",
+            "sk-prod-4f8e2a7b9c1d3e5f",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024",
+        ]:
+            assert val in html, f"Expected PII not found in example HTML: {val!r}"
 
     def test_example_workflow(self, tmp_path):
+        """Full replace + restore on committed example files must round-trip cleanly."""
         import shutil
-        scrape = tmp_path / "scrape_output.txt"
+        html = tmp_path / "dashboard.html"
         kw = tmp_path / "keywords.txt"
         mapping = tmp_path / "mapping.json"
-        shutil.copy(self.EXAMPLES_DIR / "scrape_output.txt", scrape)
+        shutil.copy(self.EXAMPLES_DIR / "dashboard.html", html)
         shutil.copy(self.EXAMPLES_DIR / "keywords.txt", kw)
 
-        cmd_replace(ns_replace(kw, scrape, mapping))
-        tokenised = scrape.read_text(encoding="utf-8")
+        original = html.read_text(encoding="utf-8")
 
-        assert "admin@acme-internal.com" not in tokenised
-        assert "Admin2024!" not in tokenised
+        cmd_replace(ns_replace(kw, html, mapping))
+        tokenised = html.read_text(encoding="utf-8")
+
+        # Verify no PII leaks
+        assert "alice.wu@acme-corp.internal" not in tokenised
+        assert "sk-prod-4f8e2a7b9c1d3e5f" not in tokenised
+        assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024" not in tokenised
         assert "[[KW_" in tokenised
 
-        cmd_restore(ns_restore(mapping, scrape))
-        assert "admin@acme-internal.com" in scrape.read_text(encoding="utf-8")
+        # Restore and verify full round-trip
+        cmd_restore(ns_restore(mapping, html))
+        assert html.read_text(encoding="utf-8") == original

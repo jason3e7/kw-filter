@@ -1,8 +1,11 @@
-# Sensitive values to filter before sending to AI
-admin@acme-internal.com
-Admin2024!
-bob.chen@acme.com
-UserPass123
-acme-internal.com
-10.0.1.55
-sk-test-7f8d9e2a1b3c
+# 登入後 HTML 中的機敏資料
+alice.wu@acme-corp.internal
+wang.daming@gmail.com
+0912-345-678
+lisa.hua@outlook.com
+0978-901-234
+mei.zhang@company.tw
+0955-678-901
+acme-corp.internal
+sk-prod-4f8e2a7b9c1d3e5f
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.acme2024

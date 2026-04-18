@@ -536,68 +536,79 @@ def s08_cleanlog(prs):
 
 def s08b_playwright(prs):
     slide = blank(prs)
-    heading(slide, "案例五：爬蟲資料 + Playwright 自動化測試生成")
+    heading(slide, "案例五：登入後 HTML → 過濾 PII → AI 生成 Playwright 測試")
 
     ty = BODY_TOP
     txtbox(slide, ML, ty, HW, Inches(0.32), "情境", size=Pt(15), color=ACCENT, bold=True)
     ty += Inches(0.36)
-    txtbox(slide, ML, ty, HW, Inches(0.44),
-           "QA 工程師用爬蟲抓取內部 CRM 的登入頁，想請 AI 直接產生 Playwright E2E 測試腳本，但爬蟲輸出含有：",
-           size=Pt(14), color=WHITE)
-    ty += Inches(0.48)
+    txtbox(slide, ML, ty, HW, Inches(0.52),
+           "QA 工程師登入內部 CRM，將儀表板 HTML 存下來，準備讓 AI 產生 Playwright E2E 測試。"
+           "但 HTML 中混有大量真實機敏資料：",
+           size=Pt(13.5), color=WHITE)
+    ty += Inches(0.58)
 
-    for b in ["測試帳號密碼（admin@acme-internal.com / Admin2024!）",
-              "內部服務 URL（crm.acme-internal.com）",
-              "Staging API Key（sk-test-7f8d9e2a1b3c）",
-              "內網 IP / Proxy（10.0.1.55:8080）"]:
-        txtbox(slide, ML + Inches(0.2), ty, HW, Inches(0.32),
-               "•  " + b, size=Pt(13), color=WHITE)
-        ty += Inches(0.32)
+    for b in ["客戶 PII：姓名、Email、電話（wang.daming@gmail.com / 0912-345-678）",
+              "登入帳號（alice.wu@acme-corp.internal）",
+              "Session JWT（eyJhbGci…acme2024）",
+              "API Key（sk-prod-4f8e2a7b9c1d3e5f）",
+              "內部主機名稱（acme-corp.internal）"]:
+        txtbox(slide, ML + Inches(0.2), ty, HW, Inches(0.3),
+               "•  " + b, size=Pt(12.5), color=WHITE)
+        ty += Inches(0.3)
 
-    ty += Inches(0.1)
+    ty += Inches(0.12)
     txtbox(slide, ML, ty, HW, Inches(0.32), "Workflow", size=Pt(15), color=ACCENT, bold=True)
     ty += Inches(0.35)
 
-    for step in ["① replace  — 敏感值換成 token，存 mapping.json",
-                 "② 將 token 化的爬蟲輸出送給 AI",
-                 "③ AI 產出含 token 的 Playwright 程式碼",
-                 "④ restore  — token 換回真實值，腳本可直接執行"]:
-        shape = rect(slide, ML, ty, HW, Inches(0.42))
+    for step in ["① replace  — HTML 中所有機敏值換成 token",
+                 "② 將 token 化的 HTML 送給 AI",
+                 "③ AI 產出含 token 的 Playwright TypeScript",
+                 "④ restore  — token 換回真實值，腳本可直接跑"]:
+        shape = rect(slide, ML, ty, HW, Inches(0.40))
         tf = shape.text_frame
-        _set_txbody_margins(tf._txBody, l=Pt(10), t=Pt(5), anchor='ctr')
+        _set_txbody_margins(tf._txBody, l=Pt(10), t=Pt(4), anchor='ctr')
         p = tf.paragraphs[0]
         run = p.add_run(); run.text = step
-        run.font.size = Pt(13); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
-        ty += Inches(0.46)
+        run.font.size = Pt(12.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
+        ty += Inches(0.44)
 
-    # Right column — before / after code
-    token_out = ("# 爬蟲輸出（replace 後）\n"
-                 "URL: https://crm.[[KW_A1B2C3D4]]/login\n"
-                 "Admin: [[KW_E5F6A7B8]] / [[KW_C9D0E1F2]]\n"
-                 "Proxy: [[KW_11223344]]:8080\n"
-                 "Key:   [[KW_55667788]]")
+    # Right column — tokenised HTML snippet / AI output / restored code
+    token_html = ('<span id="current-user">\n'
+                  '  [[KW_A1B2C3D4]]\n'
+                  '</span>\n'
+                  '<td>[[KW_E5F6A7B8]]</td>\n'
+                  '<td>[[KW_C9D0E1F2]]</td>\n'
+                  'const SESSION = "[[KW_11223344]]";\n'
+                  'const BASE_URL = "https://api.\n'
+                  '  [[KW_55667788]]:8443/v2";')
 
-    ai_code =  ("// AI 產出（含 token）\n"
-                "await page.goto(\n"
-                "  'https://crm.[[KW_A1B2C3D4]]/login');\n"
-                "await page.fill('#email',\n"
-                "  '[[KW_E5F6A7B8]]');\n"
-                "await page.fill('#password',\n"
-                "  '[[KW_C9D0E1F2]]');\n"
-                "await page.click('#submit');")
+    ai_code =    ("// AI 產出（含 token）\n"
+                  "test('customer list', async ({ page }) => {\n"
+                  "  await page.goto(\n"
+                  "    `https://crm.[[KW_55667788]}/dashboard`);\n"
+                  "  await expect(\n"
+                  "    page.locator('#current-user'))\n"
+                  "    .toHaveText('[[KW_A1B2C3D4]]');\n"
+                  "  // verify row C001\n"
+                  "  await expect(row1.locator('td').nth(1))\n"
+                  "    .toHaveText('[[KW_E5F6A7B8]]');\n"
+                  "});")
 
     final_code = ("// restore 後（可直接執行）\n"
-                  "await page.goto(\n"
-                  "  'https://crm.acme-internal.com/login');\n"
-                  "await page.fill('#email',\n"
-                  "  'admin@acme-internal.com');\n"
-                  "await page.fill('#password',\n"
-                  "  'Admin2024!');\n"
-                  "await page.click('#submit');")
+                  "test('customer list', async ({ page }) => {\n"
+                  "  await page.goto(\n"
+                  "    'https://crm.acme-corp.internal/dashboard');\n"
+                  "  await expect(\n"
+                  "    page.locator('#current-user'))\n"
+                  "    .toHaveText('alice.wu@acme-corp.internal');\n"
+                  "  // verify row C001\n"
+                  "  await expect(row1.locator('td').nth(1))\n"
+                  "    .toHaveText('wang.daming@gmail.com');\n"
+                  "});")
 
-    code_block(slide, R, BODY_TOP,               HW, Inches(1.65), token_out,  "① replace 輸出",  label_color=WARN)
-    code_block(slide, R, BODY_TOP + Inches(1.8),  HW, Inches(2.1),  ai_code,    "③ AI 回傳（token）", label_color=MUTED)
-    code_block(slide, R, BODY_TOP + Inches(4.05), HW, Inches(2.1),  final_code, "④ restore 後",    label_color=ACCENT)
+    code_block(slide, R, BODY_TOP,               HW, Inches(1.9),  token_html, "① replace — HTML（節錄）", label_color=WARN)
+    code_block(slide, R, BODY_TOP + Inches(2.05), HW, Inches(2.35), ai_code,   "③ AI 回傳（token）",       label_color=MUTED)
+    code_block(slide, R, BODY_TOP + Inches(4.55), HW, Inches(2.35), final_code,"④ restore 後",             label_color=ACCENT)
 
 
 def s09_tests(prs):
@@ -606,38 +617,38 @@ def s09_tests(prs):
 
     headers = ["測試模組", "數量", "涵蓋面向"]
     rows = [
-        ["test_utils.py",              "27",  "工具函式、Regex 編譯、Binary search"],
+        ["test_utils.py",              "22",  "工具函式、Regex 編譯、Binary search"],
         ["test_search.py",             "16",  "搜尋、多檔案、遞迴、Unicode、JSON 輸出"],
         ["test_clear.py",              "14",  "清空、自訂替換文字、backup、多檔"],
-        ["test_replace.py",            "16",  "Token 格式、穩定性、最長關鍵字優先"],
-        ["test_restore.py",            "16",  "還原、Roundtrip、錯誤處理"],
+        ["test_replace.py",            "14",  "Token 格式、穩定性、最長關鍵字優先"],
+        ["test_restore.py",            "13",  "還原、Roundtrip、錯誤處理"],
         ["test_cleanlog.py",           "22",  "整行刪除、dry-run、stats、Unicode"],
         ["test_remap.py",              "20",  "Binary 模式替換、dry-run、Unicode"],
-        ["test_dry_run_ignore_case.py","15",  "dry-run（各指令）、大小寫不分"],
-        ["test_playwright_scenario.py", "7",  "爬蟲 → replace → AI → restore 端對端"],
+        ["test_dry_run_ignore_case.py","18",  "dry-run（各指令）、大小寫不分"],
+        ["test_playwright_scenario.py", "11", "HTML PII 過濾 → AI → restore 端對端"],
         ["test_integration.py",        "14",  "CLI subprocess 端對端測試"],
-        ["合計",                       "167", ""],
+        ["合計",                       "164", ""],
     ]
     table(slide, ML, BODY_TOP, HW + Inches(0.3), [2.1, 0.65, 3.5],
           headers, rows, row_h=Inches(0.48))
 
     pytest_out = ("$ python3 -m pytest tests/ -v\n\n"
-                  "tests/test_utils.py               ✓ 27\n"
+                  "tests/test_utils.py               ✓ 22\n"
                   "tests/test_search.py              ✓ 16\n"
                   "tests/test_clear.py               ✓ 14\n"
-                  "tests/test_replace.py             ✓ 16\n"
-                  "tests/test_restore.py             ✓ 16\n"
+                  "tests/test_replace.py             ✓ 14\n"
+                  "tests/test_restore.py             ✓ 13\n"
                   "tests/test_cleanlog.py            ✓ 22\n"
                   "tests/test_remap.py               ✓ 20\n"
-                  "tests/test_dry_run_ignore_case.py ✓ 15\n"
-                  "tests/test_playwright_scenario.py ✓  7\n"
+                  "tests/test_dry_run_ignore_case.py ✓ 18\n"
+                  "tests/test_playwright_scenario.py ✓ 11\n"
                   "tests/test_integration.py         ✓ 14\n\n"
-                  "======= 167 passed in 2.1s =======")
+                  "======= 164 passed in 2.1s =======")
     code_block(slide, R + Inches(0.15), BODY_TOP, HW - Inches(0.15), Inches(3.45), pytest_out)
 
     card(slide, R + Inches(0.15), BODY_TOP + Inches(3.6), HW - Inches(0.15), Inches(1.22),
          body=("Roundtrip 測試（test_restore.py）：replace → restore 後逐字元比對，確保原始內容 100% 還原。\n\n"
-               "Playwright 情境測試（test_playwright_scenario.py）：模擬爬蟲→AI→還原完整流程，驗證無 token 殘留。"),
+               "Playwright 情境測試（test_playwright_scenario.py）：以登入後 HTML 為輸入，驗證 PII 過濾 → AI 生成 → restore 完整流程，確保無 token 殘留，原始 HTML 可 100% 還原。"),
          border=ACCENT, body_size=Pt(13))
 
 
