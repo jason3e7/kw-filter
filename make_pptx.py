@@ -146,6 +146,7 @@ def code_block(slide, x, y, w, h, code: str, label="", label_color=MUTED):
     _set_txbody_margins(tf._txBody, l=Pt(11), r=Pt(11), t=Pt(9), b=Pt(9))
     for i, line in enumerate(code.split("\n")):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.alignment = PP_ALIGN.LEFT
         p.line_spacing = Pt(17)
         run = p.add_run()
         run.text = line
@@ -685,6 +686,10 @@ def s14_quickstart(prs):
     heading(slide, "立刻開始使用")
 
     # Left column — code blocks
+    # Heights: label(0.3) + lines×17pt + 18pt padding
+    # install: 2 lines → 0.3 + (34+18)pt = 0.3 + 0.72" = 1.02" → use 1.05"
+    # kw_file: 4 lines → 0.3 + (68+18)pt = 0.3 + 1.19" = 1.49" → use 1.55"
+    # run_cmd: 4 lines → 0.3 + (68+18)pt = 0.3 + 1.19" = 1.49" → use 1.55"
     install = "git clone https://github.com/jason3e7/kw-filter.git\ncd kw-filter"
     kw_file = "# keywords.txt\nJohn Doe\nacme-corp.com\nsk-live-abc123"
     run_cmd = ("python3 kw_tools.py search   -k kw.txt -t ./docs -r\n"
@@ -692,20 +697,21 @@ def s14_quickstart(prs):
                "python3 kw_tools.py restore  -m map.json -t ./ai_output -r\n"
                "python3 kw_tools.py cleanlog -k kw.txt -t ./logs -r --stats")
 
-    code_block(slide, ML, BODY_TOP,                HW, Inches(0.9),  install, "安裝")
-    code_block(slide, ML, BODY_TOP + Inches(1.0),  HW, Inches(1.05), kw_file, "建立關鍵字清單")
-    code_block(slide, ML, BODY_TOP + Inches(2.15), HW, Inches(1.35), run_cmd, "執行")
+    code_block(slide, ML, BODY_TOP,                HW, Inches(1.05), install, "安裝")
+    code_block(slide, ML, BODY_TOP + Inches(1.17), HW, Inches(1.55), kw_file, "建立關鍵字清單")
+    code_block(slide, ML, BODY_TOP + Inches(2.84), HW, Inches(1.55), run_cmd, "執行")
 
-    # Right column — test + summary
+    # Right column — test(2 lines=1.05") + summary card
     test_code = "pip install pytest\npython3 -m pytest tests/ -v"
-    code_block(slide, R, BODY_TOP, HW, Inches(0.9), test_code, "執行測試")
+    code_block(slide, R, BODY_TOP, HW, Inches(1.05), test_code, "執行測試")
 
-    shape = rect(slide, R, BODY_TOP + Inches(1.0), HW, Inches(2.5),
+    shape = rect(slide, R, BODY_TOP + Inches(1.17), HW, Inches(3.22),
                  fill_color=RGBColor(0x0f, 0x1f, 0x12), border_color=ACCENT)
     tf = shape.text_frame; tf.word_wrap = True
     _set_txbody_margins(tf._txBody, l=Pt(13), t=Pt(11))
 
     summary_title = tf.paragraphs[0]
+    summary_title.alignment = PP_ALIGN.LEFT
     rt = summary_title.add_run()
     rt.text = "重點回顧"; rt.font.size = Pt(15); rt.font.bold = True
     rt.font.color.rgb = ACCENT; rt.font.name = "Noto Sans TC"
@@ -716,12 +722,12 @@ def s14_quickstart(prs):
                  "10 萬行在 0.34 秒 內處理完畢",
                  "115 個測試，零第三方依賴",
                  "cleanlog：log 整行清理，含 dry-run 預覽"]:
-        p = tf.add_paragraph(); p.space_before = Pt(4)
+        p = tf.add_paragraph(); p.space_before = Pt(5)
         p.alignment = PP_ALIGN.LEFT
         run = p.add_run(); run.text = "▸  " + item
         run.font.size = Pt(13.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
 
-    txtbox(slide, ML, Inches(5.65), CW, Inches(0.3),
+    txtbox(slide, ML, Inches(6.55), CW, Inches(0.3),
            "github.com/jason3e7/kw-filter",
            size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
 
