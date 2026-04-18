@@ -9,3 +9,4 @@ build/
 *.bak
 mapping*.json
 results*.json
+*.pptx
