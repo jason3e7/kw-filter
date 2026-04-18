@@ -158,7 +158,7 @@ def code_block(slide, x, y, w, h, code: str, label="", label_color=MUTED):
 
 def table(slide, x, y, w, col_fracs: list,
           headers: list, rows: list,
-          row_h=Inches(0.44)):
+          row_h=Inches(0.44), cell_size=Pt(13)):
     n_cols = len(headers)
     n_rows = len(rows) + 1
     tbl = slide.shapes.add_table(n_rows, n_cols, x, y, w, row_h * n_rows)
@@ -167,7 +167,7 @@ def table(slide, x, y, w, col_fracs: list,
     for ci, frac in enumerate(col_fracs):
         tbl.table.columns[ci].width = int(w * frac / total_fracs)
 
-    def fmt(cell, text, bold=False, fg=WHITE, bg=BG2, size=Pt(13), align=PP_ALIGN.LEFT):
+    def fmt(cell, text, bold=False, fg=WHITE, bg=BG2, size=cell_size, align=PP_ALIGN.LEFT):
         cell.fill.solid(); cell.fill.fore_color.rgb = bg
         tf = cell.text_frame; tf.word_wrap = True
         _set_txbody_margins(tf._txBody, l=Pt(7), r=Pt(5), t=Pt(5), b=Pt(5))
@@ -572,43 +572,35 @@ def s08b_playwright(prs):
         run.font.size = Pt(12.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
         ty += Inches(0.44)
 
-    # Right column — tokenised HTML snippet / AI output / restored code
-    token_html = ('<span id="current-user">\n'
-                  '  [[KW_A1B2C3D4]]\n'
-                  '</span>\n'
+    # Right column: 3 × 2.05" code blocks, each 6 lines, total fits within 7.5"
+    # label=0.3" + rect=1.75", gap between blocks=0.1"
+    # ends at BODY_TOP + 3*2.05 + 2*0.1 = 1.18+6.35 = 7.53 → use 2.0" each
+    token_html = ('<span id="current-user">[[KW_A1B2C3D4]]</span>\n'
                   '<td>[[KW_E5F6A7B8]]</td>\n'
                   '<td>[[KW_C9D0E1F2]]</td>\n'
                   'const SESSION = "[[KW_11223344]]";\n'
-                  'const BASE_URL = "https://api.\n'
-                  '  [[KW_55667788]]:8443/v2";')
+                  'const BASE_URL =\n'
+                  '  "https://api.[[KW_55667788]]:8443/v2";')
 
     ai_code =    ("// AI 產出（含 token）\n"
-                  "test('customer list', async ({ page }) => {\n"
-                  "  await page.goto(\n"
-                  "    `https://crm.[[KW_55667788]}/dashboard`);\n"
-                  "  await expect(\n"
-                  "    page.locator('#current-user'))\n"
-                  "    .toHaveText('[[KW_A1B2C3D4]]');\n"
-                  "  // verify row C001\n"
-                  "  await expect(row1.locator('td').nth(1))\n"
-                  "    .toHaveText('[[KW_E5F6A7B8]]');\n"
-                  "});")
+                  "await page.goto(\n"
+                  "  'https://crm.[[KW_55667788]]/dashboard');\n"
+                  "await expect(page.locator('#current-user'))\n"
+                  "  .toHaveText('[[KW_A1B2C3D4]]');\n"
+                  "// row C001 → [[KW_E5F6A7B8]]")
 
     final_code = ("// restore 後（可直接執行）\n"
-                  "test('customer list', async ({ page }) => {\n"
-                  "  await page.goto(\n"
-                  "    'https://crm.acme-corp.internal/dashboard');\n"
-                  "  await expect(\n"
-                  "    page.locator('#current-user'))\n"
-                  "    .toHaveText('alice.wu@acme-corp.internal');\n"
-                  "  // verify row C001\n"
-                  "  await expect(row1.locator('td').nth(1))\n"
-                  "    .toHaveText('wang.daming@gmail.com');\n"
-                  "});")
+                  "await page.goto(\n"
+                  "  'https://crm.acme-corp.internal/dashboard');\n"
+                  "await expect(page.locator('#current-user'))\n"
+                  "  .toHaveText('alice.wu@acme-corp.internal');\n"
+                  "// row C001 → wang.daming@gmail.com")
 
-    code_block(slide, R, BODY_TOP,               HW, Inches(1.9),  token_html, "① replace — HTML（節錄）", label_color=WARN)
-    code_block(slide, R, BODY_TOP + Inches(2.05), HW, Inches(2.35), ai_code,   "③ AI 回傳（token）",       label_color=MUTED)
-    code_block(slide, R, BODY_TOP + Inches(4.55), HW, Inches(2.35), final_code,"④ restore 後",             label_color=ACCENT)
+    BH = Inches(2.0)   # block height (label 0.3 + rect 1.7)
+    BG = Inches(0.1)   # gap between blocks
+    code_block(slide, R, BODY_TOP,              HW, BH, token_html, "① replace — HTML（節錄）", label_color=WARN)
+    code_block(slide, R, BODY_TOP + BH + BG,    HW, BH, ai_code,    "③ AI 回傳（token）",       label_color=MUTED)
+    code_block(slide, R, BODY_TOP + 2*(BH+BG),  HW, BH, final_code, "④ restore 後",             label_color=ACCENT)
 
 
 def s09_tests(prs):
@@ -629,8 +621,8 @@ def s09_tests(prs):
         ["test_integration.py",        "14",  "CLI subprocess 端對端測試"],
         ["合計",                       "164", ""],
     ]
-    table(slide, ML, BODY_TOP, HW + Inches(0.3), [2.1, 0.65, 3.5],
-          headers, rows, row_h=Inches(0.48))
+    table(slide, ML, BODY_TOP, HW, [3.0, 0.65, 3.0],
+          headers, rows, row_h=Inches(0.48), cell_size=Pt(11))
 
     pytest_out = ("$ python3 -m pytest tests/ -v\n\n"
                   "tests/test_utils.py               ✓ 22\n"
@@ -646,10 +638,10 @@ def s09_tests(prs):
                   "======= 164 passed in 2.1s =======")
     code_block(slide, R + Inches(0.15), BODY_TOP, HW - Inches(0.15), Inches(3.45), pytest_out)
 
-    card(slide, R + Inches(0.15), BODY_TOP + Inches(3.6), HW - Inches(0.15), Inches(1.22),
-         body=("Roundtrip 測試（test_restore.py）：replace → restore 後逐字元比對，確保原始內容 100% 還原。\n\n"
-               "Playwright 情境測試（test_playwright_scenario.py）：以登入後 HTML 為輸入，驗證 PII 過濾 → AI 生成 → restore 完整流程，確保無 token 殘留，原始 HTML 可 100% 還原。"),
-         border=ACCENT, body_size=Pt(13))
+    card(slide, R + Inches(0.15), BODY_TOP + Inches(3.6), HW - Inches(0.15), Inches(1.6),
+         body=("Roundtrip（test_restore.py）：replace → restore 後逐字元比對，確保 100% 還原。\n\n"
+               "Playwright 情境（test_playwright_scenario.py）：登入後 HTML → PII 過濾 → AI 生成 → restore，驗證無 token 殘留。"),
+         border=ACCENT, body_size=Pt(12.5))
 
 
 def s10_perf(prs):
@@ -782,7 +774,7 @@ def s14_quickstart(prs):
 
     code_block(slide, ML, BODY_TOP,                HW, Inches(1.05), install, "安裝")
     code_block(slide, ML, BODY_TOP + Inches(1.17), HW, Inches(1.55), kw_file, "建立關鍵字清單")
-    code_block(slide, ML, BODY_TOP + Inches(2.84), HW, Inches(1.55), run_cmd, "執行")
+    code_block(slide, ML, BODY_TOP + Inches(2.84), HW, Inches(2.05), run_cmd, "執行")
 
     # Right column — online tool card + test + summary
     # Online tool card (highlight box)
