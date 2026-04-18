@@ -54,7 +54,7 @@
   .stats { display: flex; gap: 0.8em; justify-content: center; }
   .stat { text-align: center; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 0.8em 1.3em; }
   .stat-num { font-size: 2em; font-weight: 800; color: var(--accent); line-height: 1; }
-  .stat-label { font-size: 0.52em; color: var(--muted); margin-top: 0.25em; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-label { font-size: 0.52em; color: var(--muted); margin-top: 0.25em; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 
   .flow { display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
   .flow-step { background: #1e293b; border: 1px solid #475569; border-radius: 7px; padding: 0.35em 0.7em; font-size: 0.62em; white-space: nowrap; }
@@ -100,11 +100,11 @@
     <p style="font-size:1em;color:#cbd5e1;margin:0">保護隱私的 AI 資料過濾工具</p>
     <p style="font-size:0.7em;color:var(--muted);margin-top:0.3em">在資料送給 AI 之前，先把敏感關鍵字換掉；拿回答案之後，再還原回來。</p>
   </div>
-  <div class="stats" style="margin-top:2em">
-    <div class="stat"><div class="stat-num">5</div><div class="stat-label">獨立指令</div></div>
+  <div class="stats" style="margin-top:1.8em">
+    <div class="stat"><div class="stat-num">5</div><div class="stat-label">指令</div></div>
     <div class="stat"><div class="stat-num">115</div><div class="stat-label">自動化測試</div></div>
     <div class="stat"><div class="stat-num">0</div><div class="stat-label">第三方依賴</div></div>
-    <div class="stat"><div class="stat-num">29萬+</div><div class="stat-label">行/秒 處理速度</div></div>
+    <div class="stat"><div class="stat-num" style="font-size:1.6em">29萬+</div><div class="stat-label">行/秒處理</div></div>
   </div>
 </section>
 
@@ -179,40 +179,40 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
 <!-- ─── 4. HOW IT WORKS — 5 COMMANDS ────────────────────────── -->
 <section>
   <h2>運作原理：5 個獨立指令</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.45em;margin-top:0.4em">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4em;margin-top:0.4em">
     <div class="card card-blue">
       <h3><span class="cmd">search</span> &nbsp;先偵查</h3>
-      <p>掃描目錄，列出每個關鍵字出現的檔案、行號、欄位。支援遞迴與 JSON 輸出。</p>
+      <p>掃描目錄，列出關鍵字出現的檔案、行號、欄位。支援遞迴與 JSON 輸出。</p>
     </div>
     <div class="card card-blue">
       <h3><span class="cmd">clear</span> &nbsp;直接清空</h3>
-      <p>將關鍵字替換為空字串（或自訂文字）。適合不需要還原的場景。</p>
+      <p>將關鍵字替換為空字串或自訂文字。適合不需要還原的場景。</p>
     </div>
     <div class="card card-ok">
       <h3><span class="cmd">replace</span> &nbsp;換成 token</h3>
-      <p>每個關鍵字換成 <code>[[KW_XXXXXXXX]]</code>，同一關鍵字跨檔案共用同一 token，輸出 mapping.json。</p>
+      <p>每個關鍵字換成 <code>[[KW_XXXX]]</code>，同一關鍵字跨檔案共用同一 token，並輸出 mapping.json。</p>
     </div>
     <div class="card card-ok">
       <h3><span class="cmd">restore</span> &nbsp;還原</h3>
-      <p>讀取 mapping.json，將所有 token 換回原始值。不需要原始關鍵字清單。</p>
+      <p>讀取 mapping.json，將 token 換回原始值。不需要原始關鍵字清單。</p>
     </div>
     <div class="card card-purple">
       <h3><span class="cmd cmd-purple">cleanlog</span> &nbsp;清理日誌</h3>
-      <p>整行刪除：只要該行含有關鍵字，整行移除。支援 <code>--dry-run</code> 預覽與 <code>--stats</code>。</p>
+      <p>整行刪除含關鍵字的行。支援 <code>--dry-run</code> 預覽與 <code>--stats</code> 統計比例。</p>
     </div>
   </div>
-  <div class="flow" style="margin-top:0.6em">
+  <div class="flow" style="margin-top:0.5em;justify-content:center">
     <div class="flow-step">📄 原始檔案</div>
     <div class="flow-arrow">→</div>
     <div class="flow-step"><strong>replace</strong></div>
     <div class="flow-arrow">→</div>
-    <div class="flow-step">🤖 送給 AI</div>
+    <div class="flow-step">🤖 AI</div>
     <div class="flow-arrow">→</div>
-    <div class="flow-step">AI 回應（含 token）</div>
+    <div class="flow-step">AI 回應</div>
     <div class="flow-arrow">→</div>
     <div class="flow-step"><strong>restore</strong></div>
     <div class="flow-arrow">→</div>
-    <div class="flow-step">✅ 還原後答案</div>
+    <div class="flow-step">✅ 還原</div>
   </div>
 </section>
 
@@ -226,7 +226,7 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
       <h3 class="mt">問題</h3>
       <p>合約是客戶機密，直接貼上 ChatGPT 違反保密義務，且違反部分國家的資料保護法規（如 GDPR、個資法）。</p>
       <h3 class="mt">解法</h3>
-      <p>維護一份 <code>keywords.txt</code>（含客戶名、公司名、合約編號），執行 <span class="cmd">replace</span> 後再送 AI，拿回摘要後執行 <span class="cmd">restore</span>。</p>
+      <p>維護 <code>keywords.txt</code>，執行 <span class="cmd">replace</span> 再送 AI；拿回摘要後執行 <span class="cmd">restore</span> 還原。</p>
     </div>
     <div>
       <div class="compare-label label-bad">送出前（原始）</div>
@@ -260,17 +260,12 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
         <li>員工姓名寫在 TODO 裡</li>
       </ul>
       <h3 class="mt">執行方式</h3>
-      <pre><code class="language-bash"># 1. 先確認哪些地方有問題
-python3 kw_tools.py search \
+      <pre><code class="language-bash">python3 kw_tools.py search \
   -k secrets.txt -t ./src -r
 
-# 2. 一鍵替換整個 repo
 python3 kw_tools.py replace \
-  -k secrets.txt -t ./src -r \
-  -m mapping.json --backup
+  -k secrets.txt -t ./src -r -m mapping.json
 
-# 3. 把 token 化的 src 送 AI 重構
-# 4. 拿回重構結果後還原
 python3 kw_tools.py restore \
   -m mapping.json -t ./refactored -r</code></pre>
     </div>
@@ -316,17 +311,12 @@ python3 kw_tools.py restore \
     <div>
       <h3>關鍵字清單範例</h3>
       <pre><code class="language-text"># customer_kw.txt
-
-# 常見姓名（前 100 大）
-王小明
-陳美麗
-李大偉
-
+# 常見姓名
+王小明 / 陳美麗 / 李大偉
 # 客服人員
 服務專員 Andy
 服務專員 Sarah
-
-# 訂單前綴（regex 另外處理）
+# 訂單前綴
 ORD-2024-</code></pre>
       <div class="card card-ok" style="margin-top:0.7em">
         <p style="margin:0">符合個人資料保護法第 6 條「<strong>去識別化</strong>」處理要求，可作為合規佐證。</p>
