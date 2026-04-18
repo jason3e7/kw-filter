@@ -20,71 +20,72 @@
   .reveal { font-family: 'Segoe UI', 'Noto Sans TC', sans-serif; }
   .reveal h1, .reveal h2, .reveal h3 { letter-spacing: -0.02em; }
   .reveal h1 { font-size: 2.0em; color: var(--accent); }
-  .reveal h2 { font-size: 1.45em; color: #f1f5f9; border-bottom: 2px solid var(--accent); padding-bottom: 0.2em; margin-bottom: 0.6em; }
-  .reveal h3 { font-size: 1.05em; color: var(--accent); margin-bottom: 0.3em; }
-  .reveal p, .reveal li { font-size: 0.78em; line-height: 1.7; }
+  .reveal h2 { font-size: 1.35em; color: #f1f5f9; border-bottom: 2px solid var(--accent); padding-bottom: 0.12em; margin-bottom: 0.4em; }
+  .reveal h3 { font-size: 0.95em; color: var(--accent); margin-bottom: 0.15em; margin-top: 0; }
+  .reveal p, .reveal li { font-size: 0.72em; line-height: 1.55; }
+  .reveal ul { margin: 0.2em 0 0 1.2em; padding: 0; }
   .reveal section { text-align: left; }
   .reveal .center-section { text-align: center; }
 
-  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; vertical-align: middle; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.56em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; vertical-align: middle; }
   .tag-danger  { background: #7f1d1d; color: var(--danger); }
   .tag-warn    { background: #78350f; color: var(--warn); }
   .tag-ok      { background: #14532d; color: var(--accent); }
   .tag-blue    { background: #1e3a5f; color: var(--blue); }
 
-  .cards { display: grid; gap: 0.8em; }
+  .cards { display: grid; gap: 0.5em; }
   .cards-2 { grid-template-columns: 1fr 1fr; }
   .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 1em 1.2em; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 0.65em 0.9em; }
   .card-danger  { border-color: var(--danger); }
   .card-ok      { border-color: var(--accent); }
   .card-blue    { border-color: var(--blue); }
   .card-purple  { border-color: var(--purple); }
   .card-warn    { border-color: var(--warn); }
 
-  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }
-  .compare-label { font-size: 0.55em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4em; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8em; }
+  .compare-label { font-size: 0.52em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25em; }
   .label-bad  { color: var(--danger); }
   .label-good { color: var(--accent); }
 
-  .reveal pre { font-size: 0.62em; border-radius: 8px; margin: 0; box-shadow: none; }
-  .reveal pre code { max-height: 340px; padding: 0.8em 1em; }
+  .reveal pre { font-size: 0.58em; border-radius: 7px; margin: 0; box-shadow: none; }
+  .reveal pre code { max-height: 260px; padding: 0.55em 0.8em; }
 
-  .stats { display: flex; gap: 1em; justify-content: center; }
-  .stat { text-align: center; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1em 1.6em; }
-  .stat-num { font-size: 2.2em; font-weight: 800; color: var(--accent); line-height: 1; }
-  .stat-label { font-size: 0.55em; color: var(--muted); margin-top: 0.3em; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stats { display: flex; gap: 0.8em; justify-content: center; }
+  .stat { text-align: center; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 0.8em 1.3em; }
+  .stat-num { font-size: 2em; font-weight: 800; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 0.52em; color: var(--muted); margin-top: 0.25em; text-transform: uppercase; letter-spacing: 0.06em; }
 
-  .flow { display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap; }
-  .flow-step { background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: 0.5em 0.9em; font-size: 0.65em; white-space: nowrap; }
+  .flow { display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
+  .flow-step { background: #1e293b; border: 1px solid #475569; border-radius: 7px; padding: 0.35em 0.7em; font-size: 0.62em; white-space: nowrap; }
   .flow-step strong { color: var(--accent); }
-  .flow-arrow { color: var(--muted); font-size: 1em; }
+  .flow-arrow { color: var(--muted); font-size: 0.9em; }
 
-  .reveal table { font-size: 0.68em; width: 100%; }
-  .reveal table th { background: #1e293b; color: var(--accent); padding: 0.5em 0.8em; }
-  .reveal table td { padding: 0.4em 0.8em; border-bottom: 1px solid #1e293b; }
+  .reveal table { font-size: 0.63em; width: 100%; }
+  .reveal table th { background: #1e293b; color: var(--accent); padding: 0.4em 0.7em; }
+  .reveal table td { padding: 0.3em 0.7em; border-bottom: 1px solid #1e293b; }
   .reveal table tr:nth-child(even) td { background: #0f172a; }
 
   .highlight  { color: var(--accent); font-weight: 700; }
   .hi-purple  { color: var(--purple); font-weight: 700; }
   .muted { color: var(--muted); }
-  .mt { margin-top: 0.6em; }
+  .mt { margin-top: 0.4em; }
 
-  .cmd { display: inline-block; background: #0f172a; border: 1px solid #334155; border-radius: 5px; padding: 1px 7px; font-family: monospace; font-size: 0.85em; color: var(--blue); }
+  .cmd { display: inline-block; background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 1px 6px; font-family: monospace; font-size: 0.82em; color: var(--blue); }
   .cmd-purple { color: var(--purple) !important; }
 
-  .footer-note { position: absolute; bottom: 0.6em; right: 1.2em; font-size: 0.42em; color: #475569; }
+  .footer-note { position: absolute; bottom: 0.5em; right: 1em; font-size: 0.4em; color: #475569; }
 
   /* ── Big Question slide ─────────────────────────────────────── */
   .bq-section { background: radial-gradient(ellipse at 60% 40%, #1a0533 0%, #0a0a14 70%) !important; }
-  .bq-quote { font-size: 1.5em; font-weight: 700; color: #e2e8f0; line-height: 1.5; text-align: center; margin: 0.5em auto; max-width: 860px; }
+  .bq-quote { font-size: 1.3em; font-weight: 700; color: #e2e8f0; line-height: 1.5; text-align: center; margin: 0.3em auto; max-width: 860px; }
   .bq-quote em { color: var(--purple); font-style: normal; }
-  .bq-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9em; margin-top: 1.2em; }
-  .bq-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(192,132,252,0.25); border-radius: 12px; padding: 1em 1.2em; }
-  .bq-card h3 { color: var(--purple); font-size: 0.9em; }
-  .bq-card p  { color: #cbd5e1; font-size: 0.7em; line-height: 1.6; margin: 0; }
-  .bq-divider { width: 60px; height: 3px; background: linear-gradient(90deg, var(--purple), transparent); border-radius: 2px; margin: 1em auto; }
-  .bq-sub { font-size: 0.65em; color: var(--muted); text-align: center; margin-top: 1em; }
+  .bq-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.7em; margin-top: 0.8em; }
+  .bq-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(192,132,252,0.25); border-radius: 10px; padding: 0.8em 1em; }
+  .bq-card h3 { color: var(--purple); font-size: 0.85em; margin-bottom: 0.3em; }
+  .bq-card p  { color: #cbd5e1; font-size: 0.67em; line-height: 1.55; margin: 0; }
+  .bq-divider { width: 60px; height: 3px; background: linear-gradient(90deg, var(--purple), transparent); border-radius: 2px; margin: 0.6em auto; }
+  .bq-sub { font-size: 0.62em; color: var(--muted); text-align: center; margin-top: 0.7em; }
 </style>
 </head>
 <body>
@@ -178,7 +179,7 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
 <!-- ─── 4. HOW IT WORKS — 5 COMMANDS ────────────────────────── -->
 <section>
   <h2>運作原理：5 個獨立指令</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7em;margin-top:0.5em">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.45em;margin-top:0.4em">
     <div class="card card-blue">
       <h3><span class="cmd">search</span> &nbsp;先偵查</h3>
       <p>掃描目錄，列出每個關鍵字出現的檔案、行號、欄位。支援遞迴與 JSON 輸出。</p>
@@ -197,10 +198,10 @@ PROJECT     = "[[KW_77889900]]"</code></pre>
     </div>
     <div class="card card-purple">
       <h3><span class="cmd cmd-purple">cleanlog</span> &nbsp;清理日誌</h3>
-      <p>整行刪除：只要該行任何位置含有關鍵字，整行移除。有 <code>--dry-run</code> 預覽與 <code>--stats</code> 統計。</p>
+      <p>整行刪除：只要該行含有關鍵字，整行移除。支援 <code>--dry-run</code> 預覽與 <code>--stats</code>。</p>
     </div>
   </div>
-  <div class="flow" style="margin-top:0.9em">
+  <div class="flow" style="margin-top:0.6em">
     <div class="flow-step">📄 原始檔案</div>
     <div class="flow-arrow">→</div>
     <div class="flow-step"><strong>replace</strong></div>
@@ -275,13 +276,13 @@ python3 kw_tools.py restore \
     </div>
     <div>
       <h3>效果</h3>
-      <div class="card card-ok" style="margin-bottom:0.6em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <p style="margin:0">✅ AI 看到完整的邏輯結構、函式命名、模組關係</p>
       </div>
-      <div class="card card-ok" style="margin-bottom:0.6em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <p style="margin:0">✅ 所有機密字串以 token 形式保留，不影響 AI 理解程式流程</p>
       </div>
-      <div class="card card-ok" style="margin-bottom:0.6em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <p style="margin:0">✅ 還原後，重構結果直接可用，不需要手動把 API Key 貼回去</p>
       </div>
       <div class="card card-blue">
@@ -356,21 +357,20 @@ ORD-2024-</code></pre>
     </div>
     <div>
       <div class="compare-label label-bad">原始 log（含機密）</div>
-      <pre><code class="language-text">10:00:01 INFO  Server started
+      <pre style="font-size:0.54em"><code class="language-text" style="max-height:120px">10:00:01 INFO  Server started
 10:00:05 INFO  Login: alice@corp.com
 10:01:22 ERROR Auth fail: secret_token invalid
 10:01:23 INFO  Retry connection...
 10:02:00 ERROR Timeout on 192.168.1.100
 10:02:01 INFO  Connection restored
 10:03:10 DEBUG token=sk-live-abc123 cached</code></pre>
-      <div class="compare-label label-good mt">cleanlog 處理後</div>
-      <pre><code class="language-text">10:00:01 INFO  Server started
+      <div class="compare-label label-good" style="margin-top:0.3em">cleanlog 處理後</div>
+      <pre style="font-size:0.54em"><code class="language-text" style="max-height:70px">10:00:01 INFO  Server started
 10:01:23 INFO  Retry connection...
 10:02:01 INFO  Connection restored</code></pre>
-      <pre style="margin-top:0.5em"><code class="language-bash"># --dry-run 先預覽，再執行
+      <pre style="margin-top:0.3em;font-size:0.54em"><code class="language-bash" style="max-height:110px"># --dry-run 先預覽，再執行
 python3 kw_tools.py cleanlog \
-  -k keywords.txt -t ./logs -r \
-  --dry-run
+  -k keywords.txt -t ./logs -r --dry-run
 # → 4 line(s) would be removed
 
 python3 kw_tools.py cleanlog \
@@ -411,7 +411,7 @@ tests/test_cleanlog.py       ✓ 22 passed
 tests/test_integration.py    ✓ 14 passed
 
 ======= 115 passed in 1.77s =======</code></pre>
-      <div class="card card-ok" style="margin-top:0.7em">
+      <div class="card card-ok" style="margin-top:0.4em">
         <p style="margin:0"><strong>Roundtrip 測試</strong>（test_restore.py）：replace → restore 後逐字元比對，確保原始內容 100% 還原。</p>
       </div>
     </div>
@@ -548,7 +548,7 @@ restore → 作者：張三 ✓</code></pre>
       </tr>
     </tbody>
   </table>
-  <p class="mt muted">kw-filter 定位：<strong class="highlight">輕量、可還原、自訂度高</strong>，適合開發者和小型團隊快速整合到現有 workflow。</p>
+  <p style="margin-top:0.3em" class="muted">kw-filter 定位：<strong class="highlight">輕量、可還原、自訂度高</strong>，適合開發者和小型團隊快速整合到現有 workflow。</p>
 </section>
 
 <!-- ─── 13. WHY USE THIS ──────────────────────────────────────── -->
@@ -556,11 +556,11 @@ restore → 作者：張三 ✓</code></pre>
   <h2>為什麼選擇 kw-filter？</h2>
   <div class="cards cards-2">
     <div>
-      <div class="card card-ok" style="margin-bottom:0.7em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <h3>🔒 資料不離開你的掌控</h3>
         <p>所有處理都在本地執行，不呼叫任何外部服務。mapping.json 只存在你的機器上。</p>
       </div>
-      <div class="card card-ok" style="margin-bottom:0.7em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <h3>⚡ 5 分鐘內可上線</h3>
         <p>只需要 Python 3.8+，<code>git clone</code> 後直接執行。不需要安裝 model、不需要設定帳號。</p>
       </div>
@@ -570,11 +570,11 @@ restore → 作者：張三 ✓</code></pre>
       </div>
     </div>
     <div>
-      <div class="card card-ok" style="margin-bottom:0.7em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <h3>📋 可稽核、可合規</h3>
         <p>mapping.json 是明確的處理紀錄，可作為 GDPR / 個資法去識別化處理的文件佐證。</p>
       </div>
-      <div class="card card-ok" style="margin-bottom:0.7em">
+      <div class="card card-ok" style="margin-bottom:0.4em">
         <h3>🧩 適合任何 AI 服務</h3>
         <p>不綁定特定 AI。ChatGPT、Claude、Gemini、本地 LLM 都適用——就是純文字替換。</p>
       </div>
@@ -594,26 +594,20 @@ restore → 作者：張三 ✓</code></pre>
       <h3>安裝</h3>
       <pre><code class="language-bash">git clone https://github.com/YOUR/kw-filter.git
 cd kw-filter</code></pre>
-      <h3 class="mt">建立關鍵字清單</h3>
+      <h3 style="margin-top:0.3em">建立關鍵字清單</h3>
       <pre><code class="language-text"># keywords.txt
-John Doe
-acme-corp.com
-sk-live-abc123</code></pre>
-      <h3 class="mt">執行</h3>
-      <pre><code class="language-bash"># 偵查
-python3 kw_tools.py search  -k keywords.txt -t ./docs -r
-# 替換 + 送 AI
-python3 kw_tools.py replace -k keywords.txt -t ./docs -r -m mapping.json
-# 還原 AI 回應
-python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
-# 清理日誌整行
+John Doe / acme-corp.com / sk-live-abc123</code></pre>
+      <h3 style="margin-top:0.3em">執行</h3>
+      <pre><code class="language-bash">python3 kw_tools.py search   -k keywords.txt -t ./docs -r
+python3 kw_tools.py replace  -k keywords.txt -t ./docs -r -m mapping.json
+python3 kw_tools.py restore  -m mapping.json -t ./ai_output -r
 python3 kw_tools.py cleanlog -k keywords.txt -t ./logs -r --stats</code></pre>
     </div>
     <div>
       <h3>執行測試</h3>
       <pre><code class="language-bash">pip install pytest
 python3 -m pytest tests/ -v</code></pre>
-      <div class="card" style="margin-top:0.8em;background:#0f1f12;border-color:var(--accent)">
+      <div class="card" style="margin-top:0.4em;background:#0f1f12;border-color:var(--accent)">
         <h3 style="margin-top:0">重點回顧</h3>
         <ul>
           <li><strong>5</strong> 個獨立 CLI 指令，各自可單獨執行</li>
@@ -621,7 +615,7 @@ python3 -m pytest tests/ -v</code></pre>
           <li>replace → restore <strong>100% 還原</strong></li>
           <li>10 萬行在 <strong>0.34 秒</strong>內處理完畢</li>
           <li><strong>115</strong> 個測試，零第三方依賴</li>
-          <li><span class="hi-purple">cleanlog</span> 新功能：log 整行清理，含 dry-run 預覽</li>
+          <li><span class="hi-purple">cleanlog</span>：log 整行清理，含 dry-run 預覽</li>
         </ul>
       </div>
     </div>
