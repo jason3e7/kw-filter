@@ -43,8 +43,7 @@ secret_token_xyz
 
 ```bash
 python3 kw_tools.py search -k keywords.txt -t ./data -r
-python3 kw_tools.py search -k keywords.txt -t ./data -r -i            # case-insensitive
-python3 kw_tools.py search -k keywords.txt -t ./data -r --dry-run     # same as normal (read-only by nature)
+python3 kw_tools.py search -k keywords.txt -t ./data -r -i   # case-insensitive
 ```
 
 Output:
@@ -137,6 +136,8 @@ prod-db.internal -> test-db
 
 Unlike `replace` (which generates random tokens), `remap` lets you specify the exact replacement value — useful for substituting real IPs, hostnames, or emails with plausible-looking fake values before sharing logs.
 
+`remap` operates in **binary mode**: it reads and writes files as raw bytes, so it works on any file type (log files, compiled configs, binary blobs).
+
 ## Typical workflow
 
 ```bash
@@ -163,7 +164,7 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 | `--backup` | clear, replace, restore, remap | Save `.bak` copy before modifying |
 | `--replacement TEXT` | clear | Fill string instead of empty (default: `""`) |
 | `-o FILE` | search | Save search results as JSON |
-| `--dry-run` | all | Preview changes without modifying files |
+| `--dry-run` | clear, replace, restore, cleanlog, remap | Preview changes without modifying files |
 | `-i, --ignore-case` | search, clear, replace, cleanlog, remap | Match keywords case-insensitively |
 | `--stats` | cleanlog | Show removed/kept count and percentage per file |
 | `--remap FILE` | remap | Remap list file (`original -> replacement`) |

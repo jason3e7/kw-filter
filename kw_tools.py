@@ -122,21 +122,6 @@ def cmd_search(args: argparse.Namespace) -> None:
                     )
                 )
 
-    if getattr(args, "dry_run", False):
-        if not matches:
-            print("No keywords found.")
-            return
-        current_file = None
-        for m in matches:
-            if m.file != current_file:
-                current_file = m.file
-                print(f"\n{m.file}")
-                print("-" * len(m.file))
-            print(f"  line {m.line:>5}, col {m.col:>4}  [{m.keyword!r}]  {m.context}")
-        print(f"\nTotal: {len(matches)} occurrence(s) across "
-              f"{len({m.file for m in matches})} file(s).")
-        return
-
     if not matches:
         print("No keywords found.")
         return
@@ -418,41 +403,43 @@ def cmd_remap(args: argparse.Namespace) -> None:
     ignore_case = getattr(args, "ignore_case", False)
     originals = sorted(mapping.keys(), key=len, reverse=True)
     flags = re.IGNORECASE if ignore_case else 0
-    pattern = re.compile("|".join(re.escape(k) for k in originals), flags)
+    pattern = re.compile(b"|".join(re.escape(k.encode()) for k in originals), flags)
 
-    # For ignore_case: canonical lookup by lowered key
+    # Build bytes mapping; for ignore_case keys are lowered bytes
     if ignore_case:
-        mapping = {k.lower(): v for k, v in mapping.items()}
+        bytes_mapping = {k.lower().encode(): v.encode() for k, v in mapping.items()}
+    else:
+        bytes_mapping = {k.encode(): v.encode() for k, v in mapping.items()}
     total_changed = 0
 
-    for fpath in iter_files(args.target, args.recursive, False):
+    for fpath in iter_files(args.target, args.recursive, True):
         try:
-            original_text = fpath.read_text(encoding="utf-8", errors="replace")
+            original_bytes = fpath.read_bytes()
         except OSError as e:
             print(f"[skip] {fpath}: {e}", file=sys.stderr)
             continue
 
-        def replacer(m: re.Match) -> str:
+        def replacer(m: re.Match) -> bytes:
             key = m.group(0).lower() if ignore_case else m.group(0)
-            return mapping[key]
+            return bytes_mapping[key]
 
-        new_text, n = pattern.subn(replacer, original_text)
+        new_bytes, n = pattern.subn(replacer, original_bytes)
         if n == 0:
             continue
 
         if args.dry_run:
             print(f"\n{fpath}  ({n} replacement(s) would be made)")
-            for lineno, line in enumerate(original_text.splitlines(), 1):
+            for lineno, line in enumerate(original_bytes.splitlines(), 1):
                 if pattern.search(line):
                     new_line = pattern.sub(replacer, line)
-                    print(f"  line {lineno:>4}  - {line.rstrip()}")
-                    print(f"           + {new_line.rstrip()}")
+                    print(f"  line {lineno:>4}  - {line.decode(errors='replace').rstrip()}")
+                    print(f"           + {new_line.decode(errors='replace').rstrip()}")
             continue
 
         if args.backup:
             shutil.copy2(fpath, str(fpath) + ".bak")
 
-        fpath.write_text(new_text, encoding="utf-8")
+        fpath.write_bytes(new_bytes)
         print(f"  remapped {n:>4} value(s)  {fpath}")
         total_changed += n
 
@@ -498,7 +485,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # search
     s1 = sub.add_parser("search", help="find all keyword occurrences")
-    add_common(s1, need_backup=False, need_dry_run=True, need_ignore_case=True)
+    add_common(s1, need_backup=False, need_ignore_case=True)
     s1.add_argument("--binary", action="store_true",
                     help="also search binary files")
     s1.add_argument("-o", "--output", metavar="JSON",

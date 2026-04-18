@@ -21,28 +21,6 @@ def kw(tmp_path, words):
 # DRY-RUN
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestDryRunSearch:
-    def test_dry_run_no_file_change(self, tmp_path):
-        f = tmp_path / "t.txt"
-        f.write_text("hello world\n", encoding="utf-8")
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, dry_run=True))
-        assert f.read_text(encoding="utf-8") == "hello world\n"
-
-    def test_dry_run_output_not_saved(self, tmp_path):
-        f = tmp_path / "t.txt"
-        f.write_text("hello world\n", encoding="utf-8")
-        out = tmp_path / "results.json"
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, dry_run=True, output=str(out)))
-        # dry_run exits before saving JSON
-        assert not out.exists()
-
-    def test_dry_run_shows_matches(self, tmp_path, capsys):
-        f = tmp_path / "t.txt"
-        f.write_text("hello world\n", encoding="utf-8")
-        cmd_search(ns_search(kw(tmp_path, ["hello"]), f, dry_run=True))
-        out = capsys.readouterr().out
-        assert "hello" in out
-
 
 class TestDryRunClear:
     def test_dry_run_does_not_modify_file(self, tmp_path):
@@ -226,20 +204,20 @@ class TestIgnoreCaseRemap:
         rf = tmp_path / "remap.txt"
         rf.write_text("alice -> user_a\n", encoding="utf-8")
         f = tmp_path / "t.txt"
-        f.write_text("login: ALICE\n", encoding="utf-8")
+        f.write_bytes(b"login: ALICE\n")
         cmd_remap(ns_remap(rf, f, ignore_case=True))
-        text = f.read_text(encoding="utf-8")
-        assert "user_a" in text
-        assert "ALICE" not in text
+        data = f.read_bytes()
+        assert b"user_a" in data
+        assert b"ALICE" not in data
 
     def test_case_sensitive_does_not_remap_uppercase(self, tmp_path):
         rf = tmp_path / "remap.txt"
         rf.write_text("alice -> user_a\n", encoding="utf-8")
         f = tmp_path / "t.txt"
-        original = "login: ALICE\n"
-        f.write_text(original, encoding="utf-8")
+        original = b"login: ALICE\n"
+        f.write_bytes(original)
         cmd_remap(ns_remap(rf, f, ignore_case=False))
-        assert f.read_text(encoding="utf-8") == original
+        assert f.read_bytes() == original
 
 
 # ══════════════════════════════════════════════════════════════════════════════

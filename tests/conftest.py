@@ -14,14 +14,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # ── Namespace builders ─────────────────────────────────────────────────────────
 
 def ns_search(keywords, target, recursive=False, binary=False, output=None,
-              dry_run=False, ignore_case=False):
+              ignore_case=False):
     return argparse.Namespace(
         keywords=str(keywords),
         target=str(target),
         recursive=recursive,
         binary=binary,
         output=output,
-        dry_run=dry_run,
         ignore_case=ignore_case,
     )
 
