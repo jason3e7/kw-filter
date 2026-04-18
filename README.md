@@ -43,6 +43,8 @@ secret_token_xyz
 
 ```bash
 python3 kw_tools.py search -k keywords.txt -t ./data -r
+python3 kw_tools.py search -k keywords.txt -t ./data -r -i            # case-insensitive
+python3 kw_tools.py search -k keywords.txt -t ./data -r --dry-run     # same as normal (read-only by nature)
 ```
 
 Output:
@@ -65,17 +67,22 @@ python3 kw_tools.py search -k keywords.txt -t ./data -r -o results.json
 ```bash
 python3 kw_tools.py clear -k keywords.txt -t ./data -r
 python3 kw_tools.py clear -k keywords.txt -t ./data -r --replacement "[REDACTED]"
-python3 kw_tools.py clear -k keywords.txt -t ./data -r --backup   # save .bak before editing
+python3 kw_tools.py clear -k keywords.txt -t ./data -r --backup     # save .bak before editing
+python3 kw_tools.py clear -k keywords.txt -t ./data -r --dry-run    # preview changes
+python3 kw_tools.py clear -k keywords.txt -t ./data -r -i           # case-insensitive
 ```
 
 ### 3. Replace — tokenise + generate mapping table
 
 ```bash
-python3 kw_tools.py replace -k keywords.txt -t ./data -r -m mapping.json
+python3 kw_tools.py replace -k keywords.txt -t ./data -r
+python3 kw_tools.py replace -k keywords.txt -t ./data -r -m custom.json  # custom mapping path
+python3 kw_tools.py replace -k keywords.txt -t ./data -r -i             # case-insensitive
 ```
 
 Each keyword is replaced with a unique token like `[[KW_3F9A1C2D]]`.  
-The same keyword always maps to the same token across all files.
+The same keyword always maps to the same token across all files.  
+`-m/--mapping` defaults to `mapping.json` if not specified.
 
 `mapping.json`:
 ```json
@@ -85,13 +92,18 @@ The same keyword always maps to the same token across all files.
 }
 ```
 
+When `-i` is used, all case variants (`john doe`, `JOHN DOE`) map to the same token using the canonical form from the keyword file.
+
 ### 4. Restore — put originals back
 
 ```bash
-python3 kw_tools.py restore -m mapping.json -t ./data -r
+python3 kw_tools.py restore -t ./data -r
+python3 kw_tools.py restore -m custom.json -t ./data -r  # custom mapping path
+python3 kw_tools.py restore -m mapping.json -t ./data -r --dry-run  # preview
 ```
 
-Does not require the keyword list — only the mapping table.
+Does not require the keyword list — only the mapping table.  
+`-m/--mapping` defaults to `mapping.json` if not specified.
 
 ### 5. Cleanlog — drop sensitive log lines
 
@@ -100,6 +112,7 @@ python3 kw_tools.py cleanlog -k keywords.txt -t ./logs -r
 python3 kw_tools.py cleanlog -k keywords.txt -t app.log --dry-run   # preview
 python3 kw_tools.py cleanlog -k keywords.txt -t ./logs -r --stats   # show %
 python3 kw_tools.py cleanlog -k keywords.txt -t app.log --backup    # keep .bak
+python3 kw_tools.py cleanlog -k keywords.txt -t app.log -i          # case-insensitive
 ```
 
 Unlike `clear` (which removes only the matched text), `cleanlog` removes the **entire line** whenever a keyword appears anywhere on it. Designed for log files where a partial redaction is not sufficient.
@@ -110,6 +123,7 @@ Unlike `clear` (which removes only the matched text), `cleanlog` removes the **e
 python3 kw_tools.py remap --remap remap.txt -t ./logs -r
 python3 kw_tools.py remap --remap remap.txt -t app.log --dry-run   # preview
 python3 kw_tools.py remap --remap remap.txt -t ./logs -r --backup
+python3 kw_tools.py remap --remap remap.txt -t ./logs -r -i        # case-insensitive
 ```
 
 **Remap file format** — one `original -> replacement` pair per line:
@@ -142,14 +156,15 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 
 | Flag | Commands | Description |
 |---|---|---|
-| `-k FILE` | search, clear, replace | Keyword list file |
+| `-k FILE` | search, clear, replace, cleanlog | Keyword list file |
 | `-t PATH` | all | Target file or directory |
 | `-r` | all | Recurse into subdirectories |
-| `-m FILE` | replace, restore | Mapping table JSON path |
-| `--backup` | clear, replace, restore | Save `.bak` copy before modifying |
+| `-m FILE` | replace, restore | Mapping table JSON path (default: `mapping.json`) |
+| `--backup` | clear, replace, restore, remap | Save `.bak` copy before modifying |
 | `--replacement TEXT` | clear | Fill string instead of empty (default: `""`) |
 | `-o FILE` | search | Save search results as JSON |
-| `--dry-run` | cleanlog, remap | Preview changes without modifying files |
+| `--dry-run` | all | Preview changes without modifying files |
+| `-i, --ignore-case` | search, clear, replace, cleanlog, remap | Match keywords case-insensitively |
 | `--stats` | cleanlog | Show removed/kept count and percentage per file |
 | `--remap FILE` | remap | Remap list file (`original -> replacement`) |
 
@@ -159,9 +174,10 @@ python3 kw_tools.py restore -m mapping.json -t ./ai_output -r
 python3 -m pytest tests/ -v
 ```
 
-135 tests covering:
+161 tests covering:
 - Unit tests for all helper functions (`test_utils.py`)
-- Per-command tests with edge cases (`test_search/clear/replace/restore.py`)
+- Per-command tests with edge cases (`test_search/clear/replace/restore/remap/cleanlog.py`)
+- Cross-command tests for `--dry-run` and `-i/--ignore-case` (`test_dry_run_ignore_case.py`)
 - End-to-end CLI integration tests via subprocess (`test_integration.py`)
 
 ## Design notes

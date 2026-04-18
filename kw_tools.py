@@ -44,10 +44,11 @@ def sorted_keywords(keywords: list[str]) -> list[str]:
     return sorted(keywords, key=len, reverse=True)
 
 
-def build_pattern(keywords: list[str]) -> re.Pattern:
+def build_pattern(keywords: list[str], ignore_case: bool = False) -> re.Pattern:
     """Compile all keywords into one regex for efficient multi-keyword search."""
     parts = [re.escape(kw) for kw in sorted_keywords(keywords)]
-    return re.compile("|".join(parts))
+    flags = re.IGNORECASE if ignore_case else 0
+    return re.compile("|".join(parts), flags)
 
 
 # ── File discovery ─────────────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ def cmd_search(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords)
+    pattern = build_pattern(keywords, getattr(args, "ignore_case", False))
     matches: list[Match] = []
 
     for fpath in iter_files(args.target, args.recursive, args.binary):
@@ -120,6 +121,21 @@ def cmd_search(args: argparse.Namespace) -> None:
                         context=line.rstrip(),
                     )
                 )
+
+    if getattr(args, "dry_run", False):
+        if not matches:
+            print("No keywords found.")
+            return
+        current_file = None
+        for m in matches:
+            if m.file != current_file:
+                current_file = m.file
+                print(f"\n{m.file}")
+                print("-" * len(m.file))
+            print(f"  line {m.line:>5}, col {m.col:>4}  [{m.keyword!r}]  {m.context}")
+        print(f"\nTotal: {len(matches)} occurrence(s) across "
+              f"{len({m.file for m in matches})} file(s).")
+        return
 
     if not matches:
         print("No keywords found.")
@@ -155,8 +171,9 @@ def cmd_clear(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords)
+    pattern = build_pattern(keywords, getattr(args, "ignore_case", False))
     replacement = args.replacement  # default ""
+    dry_run = getattr(args, "dry_run", False)
 
     changed = 0
     for fpath in iter_files(args.target, args.recursive, False):
@@ -170,12 +187,24 @@ def cmd_clear(args: argparse.Namespace) -> None:
         if n == 0:
             continue
 
+        if dry_run:
+            print(f"\n{fpath}  ({n} occurrence(s) would be cleared)")
+            for lineno, line in enumerate(original.splitlines(), 1):
+                if pattern.search(line):
+                    new_line = pattern.sub(replacement, line)
+                    print(f"  line {lineno:>4}  - {line.rstrip()}")
+                    print(f"           + {new_line.rstrip()}")
+            continue
+
         if args.backup:
             shutil.copy2(fpath, str(fpath) + ".bak")
 
         fpath.write_text(new_text, encoding="utf-8")
         print(f"  cleared {n:>4} occurrence(s)  {fpath}")
         changed += n
+
+    if dry_run:
+        return
 
     print(f"\nDone. Cleared {changed} occurrence(s) total.")
 
@@ -187,12 +216,18 @@ def cmd_replace(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords)
-    mapping: dict[str, str] = {}   # token -> original keyword
+    ignore_case = getattr(args, "ignore_case", False)
+    dry_run = getattr(args, "dry_run", False)
+    pattern = build_pattern(keywords, ignore_case)
+    mapping: dict[str, str] = {}   # token -> canonical keyword
     changed_files = 0
 
-    def make_token(keyword: str) -> str:
-        """Return a stable token per unique keyword."""
+    # Build canonical form lookup for ignore_case: lowered -> original
+    canonical: dict[str, str] = {kw.lower(): kw for kw in keywords} if ignore_case else {}
+
+    def make_token(matched: str) -> str:
+        """Return a stable token per unique canonical keyword."""
+        keyword = canonical.get(matched.lower(), matched) if ignore_case else matched
         for tok, kw in mapping.items():
             if kw == keyword:
                 return tok
@@ -214,12 +249,24 @@ def cmd_replace(args: argparse.Namespace) -> None:
         if n == 0:
             continue
 
+        if dry_run:
+            print(f"\n{fpath}  ({n} occurrence(s) would be replaced)")
+            for lineno, line in enumerate(original.splitlines(), 1):
+                if pattern.search(line):
+                    new_line = pattern.sub(replacer, line)
+                    print(f"  line {lineno:>4}  - {line.rstrip()}")
+                    print(f"           + {new_line.rstrip()}")
+            continue
+
         if args.backup:
             shutil.copy2(fpath, str(fpath) + ".bak")
 
         fpath.write_text(new_text, encoding="utf-8")
         print(f"  replaced {n:>4} occurrence(s)  {fpath}")
         changed_files += 1
+
+    if dry_run:
+        return
 
     # Save mapping table
     mapping_path = Path(args.mapping)
@@ -243,6 +290,7 @@ def cmd_restore(args: argparse.Namespace) -> None:
         print("[warn] mapping table is empty.")
         return
 
+    dry_run = getattr(args, "dry_run", False)
     # Build one regex that matches any token (tokens contain literal brackets)
     token_pattern = re.compile("|".join(re.escape(t) for t in mapping))
     changed_files = 0
@@ -261,12 +309,24 @@ def cmd_restore(args: argparse.Namespace) -> None:
         if n == 0:
             continue
 
+        if dry_run:
+            print(f"\n{fpath}  ({n} token(s) would be restored)")
+            for lineno, line in enumerate(original.splitlines(), 1):
+                if token_pattern.search(line):
+                    new_line = token_pattern.sub(restore_token, line)
+                    print(f"  line {lineno:>4}  - {line.rstrip()}")
+                    print(f"           + {new_line.rstrip()}")
+            continue
+
         if args.backup:
             shutil.copy2(fpath, str(fpath) + ".bak")
 
         fpath.write_text(new_text, encoding="utf-8")
         print(f"  restored {n:>4} token(s)  {fpath}")
         changed_files += 1
+
+    if dry_run:
+        return
 
     print(f"\nDone. Restored tokens in {changed_files} file(s).")
 
@@ -278,7 +338,7 @@ def cmd_cleanlog(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords)
+    pattern = build_pattern(keywords, getattr(args, "ignore_case", False))
     total_removed = 0
     total_kept = 0
 
@@ -355,8 +415,14 @@ def cmd_remap(args: argparse.Namespace) -> None:
     if not mapping:
         return
 
+    ignore_case = getattr(args, "ignore_case", False)
     originals = sorted(mapping.keys(), key=len, reverse=True)
-    pattern = re.compile("|".join(re.escape(k) for k in originals))
+    flags = re.IGNORECASE if ignore_case else 0
+    pattern = re.compile("|".join(re.escape(k) for k in originals), flags)
+
+    # For ignore_case: canonical lookup by lowered key
+    if ignore_case:
+        mapping = {k.lower(): v for k, v in mapping.items()}
     total_changed = 0
 
     for fpath in iter_files(args.target, args.recursive, False):
@@ -367,7 +433,8 @@ def cmd_remap(args: argparse.Namespace) -> None:
             continue
 
         def replacer(m: re.Match) -> str:
-            return mapping[m.group(0)]
+            key = m.group(0).lower() if ignore_case else m.group(0)
+            return mapping[key]
 
         new_text, n = pattern.subn(replacer, original_text)
         if n == 0:
@@ -409,7 +476,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     # shared flags
-    def add_common(sp, need_keywords=True, need_target=True, need_backup=True):
+    def add_common(sp, need_keywords=True, need_target=True, need_backup=True,
+                   need_dry_run=False, need_ignore_case=False):
         if need_keywords:
             sp.add_argument("-k", "--keywords", required=True,
                             metavar="FILE", help="keyword list file (one per line)")
@@ -421,10 +489,16 @@ def build_parser() -> argparse.ArgumentParser:
         if need_backup:
             sp.add_argument("--backup", action="store_true",
                             help="save .bak copy before modifying each file")
+        if need_dry_run:
+            sp.add_argument("--dry-run", action="store_true",
+                            help="preview changes without modifying files")
+        if need_ignore_case:
+            sp.add_argument("-i", "--ignore-case", action="store_true",
+                            help="match keywords case-insensitively")
 
     # search
     s1 = sub.add_parser("search", help="find all keyword occurrences")
-    add_common(s1, need_backup=False)
+    add_common(s1, need_backup=False, need_dry_run=True, need_ignore_case=True)
     s1.add_argument("--binary", action="store_true",
                     help="also search binary files")
     s1.add_argument("-o", "--output", metavar="JSON",
@@ -433,28 +507,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     # clear
     s2 = sub.add_parser("clear", help="erase keywords from files")
-    add_common(s2)
+    add_common(s2, need_dry_run=True, need_ignore_case=True)
     s2.add_argument("--replacement", default="",
                     help="string to replace keywords with (default: empty)")
     s2.set_defaults(func=cmd_clear)
 
     # replace
     s3 = sub.add_parser("replace", help="replace keywords with tokens")
-    add_common(s3)
-    s3.add_argument("-m", "--mapping", required=True,
-                    metavar="JSON", help="output mapping table path")
+    add_common(s3, need_dry_run=True, need_ignore_case=True)
+    s3.add_argument("-m", "--mapping", default="mapping.json",
+                    metavar="JSON", help="output mapping table path (default: mapping.json)")
     s3.set_defaults(func=cmd_replace)
 
     # restore
     s4 = sub.add_parser("restore", help="restore tokens using mapping table")
-    add_common(s4, need_keywords=False)
-    s4.add_argument("-m", "--mapping", required=True,
-                    metavar="JSON", help="mapping table produced by replace")
+    add_common(s4, need_keywords=False, need_dry_run=True)
+    s4.add_argument("-m", "--mapping", default="mapping.json",
+                    metavar="JSON", help="mapping table produced by replace (default: mapping.json)")
     s4.set_defaults(func=cmd_restore)
 
     # cleanlog
     s5 = sub.add_parser("cleanlog", help="drop every line containing a keyword")
-    add_common(s5)
+    add_common(s5, need_ignore_case=True)
     s5.add_argument("--dry-run", action="store_true",
                     help="preview which lines would be removed without modifying files")
     s5.add_argument("--stats", action="store_true",
@@ -463,7 +537,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # remap
     s6 = sub.add_parser("remap", help="replace values using a remap list (e.g. real IP → dummy IP)")
-    add_common(s6, need_keywords=False)
+    add_common(s6, need_keywords=False, need_ignore_case=True)
     s6.add_argument("--remap", required=True, metavar="FILE",
                     help="remap list file (format: 'original -> replacement', one per line)")
     s6.add_argument("--dry-run", action="store_true",
