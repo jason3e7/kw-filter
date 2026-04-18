@@ -52,19 +52,20 @@ def blank(prs):
     return slide
 
 
-def _set_txbody_margins(txBody, l=Pt(8), r=Pt(8), t=Pt(6), b=Pt(6)):
+def _set_txbody_margins(txBody, l=Pt(8), r=Pt(8), t=Pt(6), b=Pt(6), anchor='t'):
     bp = txBody.find(qn('a:bodyPr'))
     if bp is not None:
         bp.set('lIns', str(int(l)))
         bp.set('rIns', str(int(r)))
         bp.set('tIns', str(int(t)))
         bp.set('bIns', str(int(b)))
+        bp.set('anchor', anchor)
 
 
-def _set_anchor_center(txBody):
+def _set_anchor(txBody, anchor='t'):
     bp = txBody.find(qn('a:bodyPr'))
     if bp is not None:
-        bp.set('anchor', 'ctr')
+        bp.set('anchor', anchor)
 
 
 def txtbox(slide, x, y, w, h, text, size=Pt(14), color=WHITE,
@@ -161,8 +162,9 @@ def table(slide, x, y, w, col_fracs: list,
     n_rows = len(rows) + 1
     tbl = slide.shapes.add_table(n_rows, n_cols, x, y, w, row_h * n_rows)
 
+    total_fracs = sum(col_fracs)
     for ci, frac in enumerate(col_fracs):
-        tbl.table.columns[ci].width = int(w * frac)
+        tbl.table.columns[ci].width = int(w * frac / total_fracs)
 
     def fmt(cell, text, bold=False, fg=WHITE, bg=BG2, size=Pt(13), align=PP_ALIGN.LEFT):
         cell.fill.solid(); cell.fill.fore_color.rgb = bg
@@ -190,7 +192,7 @@ def table(slide, x, y, w, col_fracs: list,
 def stat_box(slide, x, y, w, h, number, label):
     shape = rect(slide, x, y, w, h, fill_color=BG2, border_color=BORDER)
     tf = shape.text_frame; tf.word_wrap = True
-    _set_anchor_center(tf._txBody)
+    _set_anchor(tf._txBody, 'ctr')
     p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
     r = p.add_run()
     r.text = number; r.font.size = Pt(40); r.font.bold = True
@@ -214,7 +216,7 @@ def flow_row(slide, items: list[tuple], x, y, h=Inches(0.5)):
             bc = ACCENT if is_cmd else BORDER
             shape = rect(slide, cx, y, fw, h, fill_color=bg, border_color=bc)
         tf = shape.text_frame
-        _set_anchor_center(tf._txBody)
+        _set_anchor(tf._txBody, 'ctr')
         p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
         run = p.add_run()
         run.text = label
@@ -462,8 +464,7 @@ def s07_case3(prs):
                  "④ restore — 報告中如有引用個案，還原姓名"]:
         shape = rect(slide, ML, ty, HW, Inches(0.44))
         tf = shape.text_frame
-        _set_txbody_margins(tf._txBody, l=Pt(10), t=Pt(5))
-        _set_anchor_center(tf._txBody)
+        _set_txbody_margins(tf._txBody, l=Pt(10), t=Pt(5), anchor='ctr')
         p = tf.paragraphs[0]
         run = p.add_run(); run.text = step
         run.font.size = Pt(13.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
@@ -684,7 +685,7 @@ def s14_quickstart(prs):
     heading(slide, "立刻開始使用")
 
     # Left column — code blocks
-    install = "git clone https://github.com/YOUR/kw-filter.git\ncd kw-filter"
+    install = "git clone https://github.com/jason3e7/kw-filter.git\ncd kw-filter"
     kw_file = "# keywords.txt\nJohn Doe\nacme-corp.com\nsk-live-abc123"
     run_cmd = ("python3 kw_tools.py search   -k kw.txt -t ./docs -r\n"
                "python3 kw_tools.py replace  -k kw.txt -t ./docs -r -m map.json\n"
@@ -721,7 +722,7 @@ def s14_quickstart(prs):
         run.font.size = Pt(13.5); run.font.color.rgb = WHITE; run.font.name = "Noto Sans TC"
 
     txtbox(slide, ML, Inches(5.65), CW, Inches(0.3),
-           "github.com/YOUR/kw-filter",
+           "github.com/jason3e7/kw-filter",
            size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
 
 
@@ -747,7 +748,7 @@ def s15_bigquestion(prs):
          "AI 讓凌晨兩點整理報告變得「輕鬆」。\n輕鬆完成，不等於應該完成。\n\n工具降低了摩擦，卻也模糊了「下班」這條線。"),
         ("🧠 決策疲勞轉移",
          "AI 接管了大量判斷，但「要不要用 AI 做這件事」本身就是新的判斷負擔。\n\n我們節省了時間，卻多了焦慮。"),
-        ("🪞 效率 ≠ 意義",
+        ("💡 效率 ≠ 意義",
          "把一份報告從 4 小時壓縮成 20 分鐘——\n那多出來的 3 小時 40 分鐘，你用來做什麼？\n\n還是直接開始做下一件事？"),
     ]
     cw = Inches(3.95); cy = Inches(2.18); gap = Inches(0.2); cx = ML
