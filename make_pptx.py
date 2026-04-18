@@ -840,48 +840,68 @@ def s15_bigquestion(prs):
     fill = slide.background.fill; fill.solid()
     fill.fore_color.rgb = RGBColor(0x0d, 0x04, 0x1e)
 
-    txtbox(slide, ML, Inches(0.42), CW, Inches(0.36),
+    txtbox(slide, ML, Inches(0.38), CW, Inches(0.32),
            "大 哉 問",
            size=Pt(14), color=PURPLE, align=PP_ALIGN.CENTER)
 
-    txtbox(slide, ML, Inches(0.82), CW, Inches(1.1),
+    txtbox(slide, ML, Inches(0.72), CW, Inches(0.95),
            "AI 讓我們隨時隨地都能工作，\n但我們真的準備好「隨時隨地都在工作」了嗎？",
-           size=Pt(28), color=WHITE, bold=True, align=PP_ALIGN.CENTER)
+           size=Pt(26), color=WHITE, bold=True, align=PP_ALIGN.CENTER)
 
-    div = rect(slide, Inches(6.17), Inches(2.0), Inches(1.0), Pt(3),
+    div = rect(slide, Inches(6.17), Inches(1.75), Inches(1.0), Pt(3),
                fill_color=PURPLE, border_color=None)
     div.line.fill.background()
 
-    cards_data = [
-        ("🌙 工作侵入生活",
-         "AI 讓凌晨兩點整理報告變得「輕鬆」。\n輕鬆完成，不等於應該完成。\n\n工具降低了摩擦，卻也模糊了「下班」這條線。"),
-        ("🧠 決策疲勞轉移",
-         "AI 接管了大量判斷，但「要不要用 AI 做這件事」本身就是新的判斷負擔。\n\n我們節省了時間，卻多了焦慮。"),
-        ("💡 效率 ≠ 意義",
-         "把一份報告從 4 小時壓縮成 20 分鐘——\n那多出來的 3 小時 40 分鐘，你用來做什麼？\n\n還是直接開始做下一件事？"),
-    ]
-    cw = Inches(3.95); cy = Inches(2.18); gap = Inches(0.2); cx = ML
-    for title, body in cards_data:
-        shape = rect(slide, cx, cy, cw, Inches(2.7),
-                     fill_color=RGBColor(0x18, 0x08, 0x2a),
-                     border_color=RGBColor(0x5e, 0x28, 0x8e), border_pt=1.5)
-        tf = shape.text_frame; tf.word_wrap = True
-        _set_txbody_margins(tf._txBody, l=Pt(12), t=Pt(11))
-        p = tf.paragraphs[0]; r = p.add_run()
-        r.text = title; r.font.size = Pt(15); r.font.bold = True
-        r.font.color.rgb = PURPLE; r.font.name = "Noto Sans TC"
-        p2 = tf.add_paragraph(); p2.space_before = Pt(7)
-        r2 = p2.add_run(); r2.text = body
-        r2.font.size = Pt(13); r2.font.color.rgb = RGBColor(0xcb, 0xd5, 0xe1)
-        r2.font.name = "Noto Sans TC"
-        cx += cw + gap
+    # 2 × 2 card grid
+    CARD_BG     = RGBColor(0x18, 0x08, 0x2a)
+    CARD_BORDER = RGBColor(0x5e, 0x28, 0x8e)
+    CARD_TEXT   = RGBColor(0xcb, 0xd5, 0xe1)
 
-    txtbox(slide, ML, Inches(5.07), CW, Inches(0.38),
+    cw = HW; ch = Inches(1.95); gap_x = GAP; gap_y = Inches(0.2)
+    row1_y = Inches(1.92); row2_y = row1_y + ch + gap_y
+
+    cards = [
+        # row 1
+        (ML,  row1_y, "🌙 工作侵入生活",
+         "AI 讓凌晨兩點整理報告變得「輕鬆」。\n"
+         "輕鬆完成，不等於應該完成。\n"
+         "工具降低了摩擦，卻也模糊了「下班」這條線。"),
+        (R,   row1_y, "📱 手機 × AI ＝ 永遠在線",
+         "手機讓你隨時隨地都能用 AI——\n"
+         "通勤、吃飯、睡前都能繼續「生產」。\n"
+         "感覺一直在工作，因為你確實一直在工作。"),
+        # row 2
+        (ML,  row2_y, "😰 額度焦慮：全新的壓力",
+         "用完了 → 今天無法繼續，焦慮。\n"
+         "沒用完 → 浪費配額，也焦慮。\n"
+         "一種以前從未存在過的、工具獨有的心理負擔。"),
+        (R,   row2_y, "🧠 決策疲勞轉移",
+         "AI 接管了大量判斷，\n"
+         "但「要不要用 AI 做這件事」本身就是新的負擔。\n"
+         "我們節省了時間，卻多了另一種焦慮。"),
+    ]
+
+    for cx, cy, title, body in cards:
+        shape = rect(slide, cx, cy, cw, ch,
+                     fill_color=CARD_BG,
+                     border_color=CARD_BORDER, border_pt=1.5)
+        tf = shape.text_frame; tf.word_wrap = True
+        _set_txbody_margins(tf._txBody, l=Pt(12), r=Pt(12), t=Pt(10), b=Pt(8))
+        p = tf.paragraphs[0]; r = p.add_run()
+        r.text = title; r.font.size = Pt(14.5); r.font.bold = True
+        r.font.color.rgb = PURPLE; r.font.name = "Noto Sans TC"
+        p2 = tf.add_paragraph(); p2.space_before = Pt(6)
+        r2 = p2.add_run(); r2.text = body
+        r2.font.size = Pt(12.5); r2.font.color.rgb = CARD_TEXT
+        r2.font.name = "Noto Sans TC"
+
+    bottom_y = row2_y + ch + Inches(0.18)
+    txtbox(slide, ML, bottom_y, CW, Inches(0.35),
            "幾個沒有標準答案的問題，帶著走——",
-           size=Pt(13.5), color=MUTED, align=PP_ALIGN.CENTER)
-    txtbox(slide, ML, Inches(5.48), CW, Inches(0.52),
+           size=Pt(13), color=MUTED, align=PP_ALIGN.CENTER)
+    txtbox(slide, ML, bottom_y + Inches(0.36), CW, Inches(0.46),
            "你願意為自己設定一個「不用 AI」的時段嗎？  ·  你的邊界，是工具決定的，還是你自己決定的？",
-           size=Pt(15), color=WHITE, align=PP_ALIGN.CENTER)
+           size=Pt(14.5), color=WHITE, align=PP_ALIGN.CENTER)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
