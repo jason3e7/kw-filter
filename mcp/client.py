@@ -1,10 +1,12 @@
 """
 kw-filter MCP Client (stdio server for Claude Code)
 ====================================================
-An MCP server that runs as a subprocess under Claude Code and proxies
-kw-filter operations to the HTTP web server (server.py).
+Three tools:
+  list_files    — list tokenised files available on the server
+  get_files     — get auto-replaced (tokenised) content, safe to send to AI
+  upload_files  — upload AI output, auto-restored to original values
 
-Claude Code config  (~/.claude.json  or project .claude/settings.json):
+Claude Code config  (~/.claude.json  or  .claude/settings.json):
 
     {
       "mcpServers": {
@@ -17,7 +19,7 @@ Claude Code config  (~/.claude.json  or project .claude/settings.json):
     }
 
 Environment:
-    KW_SERVER_URL   URL of the running server.py   (default: http://localhost:8000)
+    KW_SERVER_URL   URL of the running server.py  (default: http://localhost:8000)
 """
 from __future__ import annotations
 
@@ -30,13 +32,11 @@ SERVER_URL = os.environ.get("KW_SERVER_URL", "http://localhost:8000").rstrip("/"
 mcp = FastMCP(
     "kw-filter",
     description=(
-        "Filter sensitive keywords from files before sending to AI, "
-        "then restore originals afterwards."
+        "Filter sensitive keywords before sending files to AI, "
+        "then restore originals from the AI's response."
     ),
 )
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get(path: str) -> httpx.Response:
     r = httpx.get(f"{SERVER_URL}{path}", timeout=30)
@@ -50,105 +50,53 @@ def _post(path: str, payload: dict) -> httpx.Response:
     return r
 
 
-def _del(path: str) -> httpx.Response:
-    r = httpx.delete(f"{SERVER_URL}{path}", timeout=30)
-    r.raise_for_status()
-    return r
-
-
-# ── File management tools ─────────────────────────────────────────────────────
-
-@mcp.tool()
-def upload_file(name: str, content: str) -> str:
-    """Upload a text file to the kw-filter server.
-
-    Args:
-        name:    filename including extension, e.g. "report.txt" or "keywords.txt"
-        content: full text content of the file
-
-    Returns:
-        file_id — pass this to replace(), restore(), or get_file()
-    """
-    return _post("/files/text", {"name": name, "content": content}).json()["file_id"]
-
+# ── Tools ─────────────────────────────────────────────────────────────────────
 
 @mcp.tool()
 def list_files() -> list[dict]:
-    """List all files currently stored on the kw-filter server.
+    """List all files stored on the kw-filter server.
 
-    Returns a list of {file_id, name, size} dicts.
+    Each file has already been processed with replace — its sensitive values
+    are replaced with [[KW_...]] tokens.  Use get_files() to read the content.
+
+    Returns a list of {file_id, name, size, tokens_created}.
     """
     return _get("/files").json()
 
 
 @mcp.tool()
-def get_file(file_id: str) -> str:
-    """Retrieve the text content of a stored file.
+def get_files(file_id: str) -> str:
+    """Get the tokenised content of a stored file.
+
+    The content has had all sensitive keywords replaced with [[KW_...]] tokens,
+    so it is safe to include in prompts or send to any AI service.
 
     Args:
-        file_id: ID returned by upload_file() or replace()/restore()
+        file_id: ID from list_files()
+
+    Returns:
+        Tokenised file content — use this as context for the AI.
     """
     return _get(f"/files/{file_id}").text
 
 
 @mcp.tool()
-def delete_file(file_id: str) -> str:
-    """Delete a file from the server.
+def upload_files(name: str, content: str) -> str:
+    """Upload AI-generated content and restore original values automatically.
+
+    Use this after the AI has produced output that contains [[KW_...]] tokens.
+    The server replaces every token with its original value using the stored
+    mapping, so the result is ready to use directly.
 
     Args:
-        file_id: ID of the file to delete
-    """
-    _del(f"/files/{file_id}")
-    return f"Deleted {file_id}"
-
-
-# ── kw-filter operation tools ─────────────────────────────────────────────────
-
-@mcp.tool()
-def replace(file_id: str, keywords_file_id: str) -> dict:
-    """Replace sensitive keywords in a file with anonymous [[KW_XXXXXXXX]] tokens.
-
-    Typical workflow:
-      1. Upload the file you want to sanitise → file_id
-      2. Upload a keywords.txt listing one sensitive value per line → keywords_file_id
-      3. Call replace(file_id, keywords_file_id)
-      4. Send the tokenised file content to an AI model
-      5. Call restore() on the AI's response to get real values back
-
-    Args:
-        file_id:          ID of the file to tokenise
-        keywords_file_id: ID of the keywords.txt file
+        name:    filename for the restored output, e.g. "playwright_test.ts"
+        content: AI response text that contains [[KW_...]] tokens
 
     Returns:
-        {
-          "tokenized_file_id": "...",   ← share this with the AI
-          "mapping_file_id":   "...",   ← keep this to restore later
-          "tokens_created":    N
-        }
+        Fully restored content with real values substituted back in.
     """
-    return _post("/replace", {
-        "file_id":          file_id,
-        "keywords_file_id": keywords_file_id,
-    }).json()
-
-
-@mcp.tool()
-def restore(file_id: str, mapping_file_id: str) -> str:
-    """Restore original values in a file that contains [[KW_XXXXXXXX]] tokens.
-
-    Use this on the AI's output after it has processed a tokenised file.
-
-    Args:
-        file_id:          ID of the tokenised file (e.g. AI-generated output)
-        mapping_file_id:  ID of the mapping.json produced by replace()
-
-    Returns:
-        file_id of the restored file — call get_file() to read its content
-    """
-    return _post("/restore", {
-        "file_id":         file_id,
-        "mapping_file_id": mapping_file_id,
-    }).json()["restored_file_id"]
+    data = _post("/restore", {"name": name, "content": content}).json()
+    return data["content"]
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

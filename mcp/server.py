@@ -1,24 +1,25 @@
 """
 kw-filter MCP Web Server
 ========================
-FastAPI HTTP server that stores files and exposes kw-filter replace/restore
-operations as REST endpoints.
+FastAPI server with auto replace-on-upload and auto restore.
+
+Keywords are read from  mcp/keywords.txt  by default.
+Override with env var:  KW_KEYWORDS_FILE=/path/to/keywords.txt
 
 Run:
-    pip install -r mcp/requirements.txt
-    python mcp/server.py                    # default: 0.0.0.0:8000
+    python mcp/server.py              # 0.0.0.0:8000
     python mcp/server.py --port 9000
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Optional
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
@@ -30,10 +31,26 @@ import uvicorn
 
 from kw_tools import cmd_replace, cmd_restore  # noqa: E402
 
-# ── Storage ───────────────────────────────────────────────────────────────────
+# ── Paths ─────────────────────────────────────────────────────────────────────
 
-STORAGE = Path(__file__).parent / "storage"
+MCP_DIR     = Path(__file__).parent
+STORAGE     = MCP_DIR / "storage"
+MAPPING_FILE = STORAGE / "_mapping.json"   # global accumulated mapping
+KEYWORDS_FILE = Path(os.environ.get("KW_KEYWORDS_FILE", MCP_DIR / "keywords.txt"))
+
 STORAGE.mkdir(exist_ok=True)
+
+
+# ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _require_keywords() -> Path:
+    if not KEYWORDS_FILE.exists():
+        raise HTTPException(
+            503,
+            f"keywords.txt not found at {KEYWORDS_FILE}. "
+            "Create mcp/keywords.txt or set KW_KEYWORDS_FILE env var."
+        )
+    return KEYWORDS_FILE
 
 
 def _meta(file_id: str) -> dict:
@@ -43,36 +60,94 @@ def _meta(file_id: str) -> dict:
     return json.loads((d / "_meta.json").read_text())
 
 
-def _path(file_id: str) -> Path:
-    m = _meta(file_id)
-    return STORAGE / file_id / m["name"]
-
-
-def _store(name: str, content: bytes) -> dict:
+def _store(name: str, content: bytes, extra: dict | None = None) -> dict:
     file_id = str(uuid.uuid4())
     d = STORAGE / file_id
     d.mkdir()
     (d / name).write_bytes(content)
-    meta = {"file_id": file_id, "name": name, "size": len(content)}
-    (d / "_meta.json").write_text(json.dumps(meta))
+    meta = {"file_id": file_id, "name": name, "size": len(content), **(extra or {})}
+    (d / "_meta.json").write_text(json.dumps(meta, ensure_ascii=False))
     return meta
+
+
+def _run_replace(src_name: str, src_bytes: bytes) -> tuple[bytes, int]:
+    """Replace keywords in src_bytes; merge new tokens into global mapping.
+    Returns (tokenized_bytes, tokens_created)."""
+    kw = _require_keywords()
+
+    with tempfile.TemporaryDirectory() as _tmp:
+        tmp = Path(_tmp)
+        target = tmp / src_name
+        target.write_bytes(src_bytes)
+        tmp_mapping = tmp / "mapping.json"
+
+        ns = argparse.Namespace(
+            keywords=str(kw),
+            target=str(target),
+            mapping=str(tmp_mapping),
+            backup=False,
+            dry_run=False,
+        )
+        cmd_replace(ns)
+
+        if not tmp_mapping.exists() or not json.loads(tmp_mapping.read_text()):
+            raise HTTPException(422, "no keywords matched — check keywords.txt")
+
+        new_mapping: dict = json.loads(tmp_mapping.read_text())
+
+        # Accumulate into global mapping (tokens are unique UUIDs, no collision)
+        global_mapping: dict = {}
+        if MAPPING_FILE.exists():
+            global_mapping = json.loads(MAPPING_FILE.read_text())
+        global_mapping.update(new_mapping)
+        MAPPING_FILE.write_text(json.dumps(global_mapping, ensure_ascii=False, indent=2))
+
+        return target.read_bytes(), len(new_mapping)
+
+
+def _run_restore(name: str, content: str) -> bytes:
+    """Restore tokens in content using global mapping. Returns restored bytes."""
+    if not MAPPING_FILE.exists():
+        raise HTTPException(422, "no mapping available — upload a file first to build the mapping")
+
+    with tempfile.TemporaryDirectory() as _tmp:
+        tmp = Path(_tmp)
+        target = tmp / name
+        target.write_text(content, encoding="utf-8")
+        shutil.copy(MAPPING_FILE, tmp / "mapping.json")
+
+        ns = argparse.Namespace(
+            mapping=str(tmp / "mapping.json"),
+            target=str(target),
+            backup=False,
+            dry_run=False,
+        )
+        cmd_restore(ns)
+
+        return target.read_bytes()
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="kw-filter Server",
-    description="File storage + kw-filter replace/restore API",
-    version="1.0.0",
+    description=(
+        "Upload files → auto replace with keywords.txt. "
+        "GET /files/{id} → tokenised content safe to send to AI. "
+        "POST /restore → AI output restored to original values."
+    ),
+    version="2.0.0",
 )
 
 
 # ── File endpoints ────────────────────────────────────────────────────────────
 
-@app.post("/files", summary="Upload file (multipart — for browser / curl)")
+@app.post("/files", summary="Upload file (multipart) — auto replace runs immediately")
 async def upload_file(file: UploadFile):
-    content = await file.read()
-    return _store(file.filename or "upload.bin", content)
+    src = await file.read()
+    name = file.filename or "upload.bin"
+    tokenized, n = _run_replace(name, src)
+    return _store(name, tokenized, extra={"tokens_created": n})
 
 
 class TextBody(BaseModel):
@@ -80,24 +155,29 @@ class TextBody(BaseModel):
     content: str
 
 
-@app.post("/files/text", summary="Upload text content as a named file")
+@app.post("/files/text", summary="Upload text content — auto replace runs immediately")
 def upload_text(body: TextBody):
-    return _store(body.name, body.content.encode("utf-8"))
+    tokenized, n = _run_replace(body.name, body.content.encode("utf-8"))
+    return _store(body.name, tokenized, extra={"tokens_created": n})
 
 
-@app.get("/files", summary="List all stored files")
+@app.get("/files", summary="List stored (tokenised) files")
 def list_files():
     out = []
     for d in sorted(STORAGE.iterdir()):
         m = d / "_meta.json"
         if m.exists():
-            out.append(json.loads(m.read_text()))
+            meta = json.loads(m.read_text())
+            # Skip internal files
+            if not meta["name"].startswith("_"):
+                out.append(meta)
     return out
 
 
-@app.get("/files/{file_id}", summary="Get file content as text")
+@app.get("/files/{file_id}", summary="Get tokenised file content")
 def get_file(file_id: str):
-    fp = _path(file_id)
+    meta = _meta(file_id)
+    fp = STORAGE / file_id / meta["name"]
     try:
         return PlainTextResponse(fp.read_text(encoding="utf-8"))
     except UnicodeDecodeError:
@@ -106,105 +186,48 @@ def get_file(file_id: str):
 
 @app.delete("/files/{file_id}", summary="Delete a stored file")
 def delete_file(file_id: str):
-    _meta(file_id)   # raises 404 if missing
+    _meta(file_id)
     shutil.rmtree(STORAGE / file_id)
     return {"deleted": file_id}
 
 
-# ── kw-filter operations ──────────────────────────────────────────────────────
+# ── Restore endpoint ──────────────────────────────────────────────────────────
 
-class ReplaceRequest(BaseModel):
-    file_id: str
-    keywords_file_id: str
-
-
-class RestoreRequest(BaseModel):
-    file_id: str
-    mapping_file_id: str
+class RestoreBody(BaseModel):
+    name: str
+    content: str
 
 
-@app.post("/replace", summary="Replace sensitive keywords with tokens")
-def do_replace(body: ReplaceRequest):
+@app.post("/restore", summary="Restore AI output: tokens → original values")
+def do_restore(body: RestoreBody):
     """
-    Run kw-filter replace on a stored file.
-
-    - **file_id**: ID of the file to tokenise
-    - **keywords_file_id**: ID of the keywords.txt file
-
-    Returns `tokenized_file_id` and `mapping_file_id`.
-    The mapping is needed later by `/restore`.
+    Pass the AI's response (containing [[KW_...]] tokens) here.
+    Uses the global mapping built from all previous uploads.
+    Returns the restored content and stores it.
     """
-    src = _path(body.file_id)
-    kw_path = _path(body.keywords_file_id)
-    src_meta = _meta(body.file_id)
-
-    with tempfile.TemporaryDirectory() as _tmp:
-        tmp = Path(_tmp)
-        target = tmp / src_meta["name"]
-        shutil.copy(src, target)
-        mapping_file = tmp / "mapping.json"
-
-        ns = argparse.Namespace(
-            keywords=str(kw_path),
-            target=str(target),
-            mapping=str(mapping_file),
-            backup=False,
-            dry_run=False,
-        )
-        cmd_replace(ns)
-
-        if not mapping_file.exists():
-            raise HTTPException(422, "replace produced no mapping — no keywords found in file")
-
-        if not mapping_file.exists():
-            raise HTTPException(422, "replace produced no output — no keywords found in file")
-        mapping_content = mapping_file.read_bytes()
-        tokens_created = len(json.loads(mapping_content))
-        if tokens_created == 0:
-            raise HTTPException(422, "no keywords matched — check your keywords.txt")
-
-        tok_meta = _store(f"tokenized_{src_meta['name']}", target.read_bytes())
-        map_meta = _store("mapping.json", mapping_content)
-
+    restored = _run_restore(body.name, body.content)
+    meta = _store(f"restored_{body.name}", restored)
     return {
-        "tokenized_file_id": tok_meta["file_id"],
-        "mapping_file_id":   map_meta["file_id"],
-        "tokens_created":    tokens_created,
+        "file_id": meta["file_id"],
+        "name":    meta["name"],
+        "content": restored.decode("utf-8"),
     }
 
 
-@app.post("/restore", summary="Restore original values from tokens")
-def do_restore(body: RestoreRequest):
-    """
-    Run kw-filter restore on a tokenised file.
+# ── Keywords management ───────────────────────────────────────────────────────
 
-    - **file_id**: ID of the tokenised file (e.g. AI-generated output)
-    - **mapping_file_id**: ID of the mapping.json produced by `/replace`
+@app.get("/keywords", summary="Show current keywords.txt content")
+def get_keywords():
+    kw = _require_keywords()
+    return PlainTextResponse(kw.read_text(encoding="utf-8"))
 
-    Returns `restored_file_id`.
-    """
-    src = _path(body.file_id)
-    mapping_src = _path(body.mapping_file_id)
-    src_meta = _meta(body.file_id)
 
-    with tempfile.TemporaryDirectory() as _tmp:
-        tmp = Path(_tmp)
-        target = tmp / src_meta["name"]
-        shutil.copy(src, target)
-        mapping_file = tmp / "mapping.json"
-        shutil.copy(mapping_src, mapping_file)
-
-        ns = argparse.Namespace(
-            mapping=str(mapping_file),
-            target=str(target),
-            backup=False,
-            dry_run=False,
-        )
-        cmd_restore(ns)
-
-        restored_meta = _store(f"restored_{src_meta['name']}", target.read_bytes())
-
-    return {"restored_file_id": restored_meta["file_id"]}
+@app.put("/keywords", summary="Update keywords.txt")
+def put_keywords(body: TextBody):
+    KEYWORDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    KEYWORDS_FILE.write_text(body.content, encoding="utf-8")
+    lines = [l for l in body.content.splitlines() if l.strip() and not l.startswith("#")]
+    return {"keywords_count": len(lines)}
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM Dashboard — Acme Corp</title>
+</head>
+<body>
+  <!-- Internal CRM system — authenticated session -->
+  <header>
+    <span id="current-user">[[KW_1CAA02B0]]</span>
+    <span id="api-key" style="display:none">[[KW_58420B75]]</span>
+    <a href="https://crm.[[KW_EFE43986]]/logout">Logout</a>
+  </header>
+
+  <section id="customer-list">
+    <h2>客戶管理</h2>
+    <table id="tbl-customers">
+      <thead>
+        <tr>
+          <th>姓名</th><th>Email</th><th>電話</th><th>帳號餘額</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-id="C001">
+          <td>王大明</td>
+          <td>[[KW_28777929]]</td>
+          <td>[[KW_4485E4A8]]</td>
+          <td>$128,450</td>
+          <td><button data-action="edit" data-id="C001">編輯</button></td>
+        </tr>
+        <tr data-id="C002">
+          <td>李小華</td>
+          <td>[[KW_A208CBF0]]</td>
+          <td>[[KW_5AD5DA0C]]</td>
+          <td>$56,200</td>
+          <td><button data-action="edit" data-id="C002">編輯</button></td>
+        </tr>
+        <tr data-id="C003">
+          <td>張美玲</td>
+          <td>[[KW_97B89B74]]</td>
+          <td>[[KW_55210215]]</td>
+          <td>$302,800</td>
+          <td><button data-action="edit" data-id="C003">編輯</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="system-config">
+    <h3>系統設定</h3>
+    <dl>
+      <dt>內部 API 端點</dt>
+      <dd id="api-endpoint">https://api.[[KW_EFE43986]]:8443/v2</dd>
+      <dt>資料庫主機</dt>
+      <dd id="db-host">db-primary.[[KW_EFE43986]]</dd>
+    </dl>
+  </section>
+
+  <script>
+    // Bootstrap: fetch customer details
+    const SESSION_TOKEN = "[[KW_BDD1D140]]";
+    const BASE_URL = "https://api.[[KW_EFE43986]]:8443/v2";
+    function loadCustomer(id) {
+      fetch(`${BASE_URL}/customers/${id}`, {
+        headers: { Authorization: `Bearer ${SESSION_TOKEN}` }
+      });
+    }
+  </script>
+</body>
+</html>
