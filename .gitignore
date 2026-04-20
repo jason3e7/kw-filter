@@ -10,3 +10,4 @@ build/
 mapping*.json
 results*.json
 *.pptx
+mcp/storage/
