@@ -16,6 +16,7 @@ Claude Code ──stdio──► client.py ──HTTP──► server.py :8000
 | `server.py` | FastAPI — auto replace on upload, auto restore endpoint |
 | `client.py` | MCP stdio server — 3 tools for Claude Code |
 | `keywords.txt` | One sensitive value per line (**create this first**) |
+| `ip_blacklist.txt` | One blocked IP per line; restricts access to sensitive endpoints |
 
 ## Setup
 
@@ -57,7 +58,13 @@ curl http://localhost:8000/files/abc-123
 curl -X POST http://localhost:8000/restore \
   -H "Content-Type: application/json" \
   -d '{"name": "ai_output.txt", "content": "...AI response with [[KW_...]] tokens..."}'
-# → {"file_id": "...", "name": "restored_ai_output.txt", "content": "...original values..."}
+# → {"success": true, "name": "restored_ai_output.txt"}
+
+# List restored files
+curl http://localhost:8000/restored
+
+# Download a restored file
+curl http://localhost:8000/restored/restored_ai_output.txt
 
 # View / update keywords
 curl http://localhost:8000/keywords
@@ -65,6 +72,25 @@ curl -X PUT http://localhost:8000/keywords \
   -H "Content-Type: application/json" \
   -d '{"name": "kw", "content": "new_keyword_1\nnew_keyword_2\n"}'
 ```
+
+---
+
+## IP Blacklist
+
+Certain endpoints contain sensitive information and should not be publicly accessible:
+`/docs`, `/openapi.json`, `/redoc`, `/keywords`, `/restored`
+
+To block specific IPs from these endpoints, edit `mcp/ip_blacklist.txt`:
+
+```
+# ip_blacklist.txt — one IP per line, # lines are comments
+203.0.113.10
+198.51.100.42
+```
+
+- The file is reloaded on every request — no server restart needed.
+- Empty file or file not present = no restriction (all IPs allowed).
+- Supports `X-Real-IP` and `X-Forwarded-For` headers (reverse proxy friendly).
 
 ---
 
@@ -113,14 +139,16 @@ Claude: [list_files() → finds dashboard.html with file_id abc-123]
 You: Now restore the real values.
 
 Claude: [upload_files("test.ts", "<the test above>")]
-        → returns test with acme-corp.internal, alice@corp.com etc. restored
+        → Restored successfully → restored_test.ts
 ```
+
+The restored file is saved to `mcp/restored/` on the server and accessible via `GET /restored/restored_test.ts`.
 
 ---
 
 ## Running tests
 
 ```bash
-python3 -m pytest tests/test_mcp_server.py -v   # 20 tests
+python3 -m pytest tests/test_mcp_server.py -v   # 21 tests
 python3 -m pytest tests/ -v                      # all tests
 ```

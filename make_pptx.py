@@ -827,6 +827,93 @@ def s14_quickstart(prs):
            size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
 
 
+def s14b_mcp(prs):
+    slide = blank(prs)
+    heading(slide, "MCP 整合：Claude Code × kw-filter Server")
+
+    # ── Left column ───────────────────────────────────────────────────────────
+    # Architecture diagram
+    arch = (
+        "Claude Code ──stdio──► client.py\n"
+        "                           │\n"
+        "                        HTTP :8000\n"
+        "                           │\n"
+        "                       server.py\n"
+        "                    ┌──────┴──────┐\n"
+        "               storage/       restored/\n"
+        "             (tokenised)     (還原後)"
+    )
+    code_block(slide, ML, BODY_TOP, HW, Inches(2.0), arch, "架構", label_color=ACCENT)
+
+    # 3 MCP tools
+    tools_y = BODY_TOP + Inches(2.12)
+    card(slide, ML, tools_y, HW, Inches(0.46),
+         title="list_files()",
+         body="列出所有已上傳（自動 tokenised）的檔案",
+         body_size=Pt(12.5))
+    card(slide, ML, tools_y + Inches(0.52), HW, Inches(0.46),
+         title="get_files(file_id)",
+         body="取得 tokenised 內容 — 安全送入任何 AI",
+         body_size=Pt(12.5))
+    card(slide, ML, tools_y + Inches(1.04), HW, Inches(0.46),
+         title="upload_files(name, content)",
+         body="AI 產出含 token 的內容 → 自動還原並儲存",
+         body_size=Pt(12.5))
+
+    # Claude config snippet
+    cfg = (
+        '# ~/.claude.json\n'
+        '"mcpServers": {\n'
+        '  "kw-filter": {\n'
+        '    "command": "python3",\n'
+        '    "args": [".../mcp/client.py"],\n'
+        '    "env": {"KW_SERVER_URL": "http://localhost:8000"}\n'
+        '  }\n'
+        '}'
+    )
+    code_block(slide, ML, tools_y + Inches(1.62), HW, Inches(1.84), cfg, "Claude Code 設定")
+
+    # ── Right column ──────────────────────────────────────────────────────────
+    # Endpoints table
+    tbl_rows = [
+        ["POST /files  /files/text", "上傳並自動 replace，回傳 file_id"],
+        ["GET  /files",              "列出已 tokenised 的檔案"],
+        ["GET  /files/{id}",         "取得 tokenised 內容"],
+        ["POST /restore",            "還原 token → 原始值，存入 restored/"],
+        ["GET  /restored",           "列出所有還原後的檔案"],
+        ["GET  /restored/{name}",    "下載還原後的檔案"],
+        ["GET|PUT /keywords",        "查看／更新 keywords.txt"],
+    ]
+    table(slide, R, BODY_TOP, HW,
+          col_fracs=[1.7, 2.3],
+          headers=["Endpoint", "說明"],
+          rows=tbl_rows,
+          row_h=Inches(0.4),
+          cell_size=Pt(11))
+
+    # IP blacklist config
+    bl_y = BODY_TOP + Inches(3.32)
+    blacklist_code = (
+        "# mcp/ip_blacklist.txt\n"
+        "# 每行一個 IP，# 開頭為註解\n"
+        "# 空白檔案 = 不限制\n"
+        "203.0.113.10\n"
+        "198.51.100.42"
+    )
+    code_block(slide, R, bl_y, HW, Inches(1.55), blacklist_code, "IP 黑名單設定")
+
+    # Restricted endpoints note
+    note_y = bl_y + Inches(1.66)
+    card(slide, R, note_y, HW, Inches(0.62),
+         body="黑名單 IP 無法存取：/docs · /keywords · /restored\n檔案即時生效，無需重啟 server",
+         body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d),
+         border=DANGER)
+
+    txtbox(slide, ML, Inches(6.55), CW, Inches(0.3),
+           "github.com/jason3e7/kw-filter",
+           size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
+
+
 def s15_bigquestion(prs):
     slide = blank(prs)
     fill = slide.background.fill; fill.solid()
@@ -915,6 +1002,7 @@ def main():
     s12_comparison(prs)
     s13_why(prs)
     s14_quickstart(prs)
+    s14b_mcp(prs)
     s15_bigquestion(prs)
 
     out = "/home/null/kw-filter/kw-filter.pptx"
