@@ -29,13 +29,7 @@ from mcp.server.fastmcp import FastMCP
 
 SERVER_URL = os.environ.get("KW_SERVER_URL", "http://localhost:8000").rstrip("/")
 
-mcp = FastMCP(
-    "kw-filter",
-    description=(
-        "Filter sensitive keywords before sending files to AI, "
-        "then restore originals from the AI's response."
-    ),
-)
+mcp = FastMCP("kw-filter")
 
 
 def _get(path: str) -> httpx.Response:
