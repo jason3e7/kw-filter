@@ -182,6 +182,51 @@ python3 -m pytest tests/ -v
 - Cross-command tests for `--dry-run` and `-i/--ignore-case` (`test_dry_run_ignore_case.py`)
 - End-to-end CLI integration tests via subprocess (`test_integration.py`)
 
+## MCP Integration (Claude Code)
+
+kw-filter includes an MCP server + client so Claude Code can filter and restore files automatically without manual CLI steps.
+
+```
+Claude Code ──stdio──► mcp/client.py ──HTTP──► mcp/server.py :8000
+                                                     │
+                                          auto replace on upload
+                                          auto restore on /restore
+```
+
+**Quick start:**
+
+```bash
+pip install -r mcp/requirements.txt
+echo "alice@corp.com\nSecret123" > mcp/keywords.txt
+python mcp/server.py
+```
+
+Add to `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "kw-filter": {
+      "command": "python3",
+      "args": ["/absolute/path/to/kw-filter/mcp/client.py"],
+      "env": { "KW_SERVER_URL": "http://localhost:8000" }
+    }
+  }
+}
+```
+
+Three tools become available in Claude Code:
+
+| Tool | Description |
+|---|---|
+| `list_files()` | List uploaded (tokenised) files |
+| `get_files(file_id)` | Get tokenised content — safe to send to any AI |
+| `upload_files(name, content)` | Restore tokens in AI output → save to `mcp/restored/` |
+
+Restored files are accessible via `GET /restored/{name}`. To block specific IPs from sensitive endpoints (`/docs`, `/keywords`, `/restored`), add them to `mcp/ip_blacklist.txt` — one IP per line.
+
+See [`mcp/README.md`](mcp/README.md) for full documentation.
+
 ## Design notes
 
 - **Longest-keyword-first matching**: keywords are sorted by length (descending) before being compiled into a single regex, so `John Doe` is matched before `John`.

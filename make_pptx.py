@@ -832,49 +832,45 @@ def s14b_mcp(prs):
     heading(slide, "MCP 整合：Claude Code × kw-filter Server")
 
     # ── Left column ───────────────────────────────────────────────────────────
-    # Architecture diagram
+    # Architecture: 6 lines → fits in 1.80" total (incl. label)
     arch = (
         "Claude Code ──stdio──► client.py\n"
-        "                           │\n"
-        "                        HTTP :8000\n"
-        "                           │\n"
-        "                       server.py\n"
-        "                    ┌──────┴──────┐\n"
-        "               storage/       restored/\n"
-        "             (tokenised)     (還原後)"
+        "                         │  HTTP :8000\n"
+        "                     server.py :8000\n"
+        "                ┌────────┴────────┐\n"
+        "           storage/          restored/\n"
+        "         (tokenised)         (還原後)"
     )
-    code_block(slide, ML, BODY_TOP, HW, Inches(2.0), arch, "架構", label_color=ACCENT)
+    code_block(slide, ML, BODY_TOP, HW, Inches(1.80), arch, "架構", label_color=ACCENT)
 
-    # 3 MCP tools
-    tools_y = BODY_TOP + Inches(2.12)
-    card(slide, ML, tools_y, HW, Inches(0.46),
+    # 3 MCP tool cards — height 0.65" each, step 0.72"
+    tools_y = BODY_TOP + Inches(1.92)
+    card(slide, ML, tools_y, HW, Inches(0.65),
          title="list_files()",
          body="列出所有已上傳（自動 tokenised）的檔案",
          body_size=Pt(12.5))
-    card(slide, ML, tools_y + Inches(0.52), HW, Inches(0.46),
+    card(slide, ML, tools_y + Inches(0.72), HW, Inches(0.65),
          title="get_files(file_id)",
          body="取得 tokenised 內容 — 安全送入任何 AI",
          body_size=Pt(12.5))
-    card(slide, ML, tools_y + Inches(1.04), HW, Inches(0.46),
+    card(slide, ML, tools_y + Inches(1.44), HW, Inches(0.65),
          title="upload_files(name, content)",
          body="AI 產出含 token 的內容 → 自動還原並儲存",
          body_size=Pt(12.5))
 
-    # Claude config snippet
+    # Claude config snippet — 6 lines
     cfg = (
         '# ~/.claude.json\n'
-        '"mcpServers": {\n'
-        '  "kw-filter": {\n'
-        '    "command": "python3",\n'
-        '    "args": [".../mcp/client.py"],\n'
-        '    "env": {"KW_SERVER_URL": "http://localhost:8000"}\n'
-        '  }\n'
+        '"kw-filter": {\n'
+        '  "command": "python3",\n'
+        '  "args": [".../mcp/client.py"],\n'
+        '  "env": {"KW_SERVER_URL": "http://localhost:8000"}\n'
         '}'
     )
-    code_block(slide, ML, tools_y + Inches(1.62), HW, Inches(1.84), cfg, "Claude Code 設定")
+    code_block(slide, ML, tools_y + Inches(2.21), HW, Inches(1.80), cfg, "Claude Code 設定")
 
     # ── Right column ──────────────────────────────────────────────────────────
-    # Endpoints table
+    # Endpoints table — 7 data rows at 0.38" each
     tbl_rows = [
         ["POST /files  /files/text", "上傳並自動 replace，回傳 file_id"],
         ["GET  /files",              "列出已 tokenised 的檔案"],
@@ -888,28 +884,28 @@ def s14b_mcp(prs):
           col_fracs=[1.7, 2.3],
           headers=["Endpoint", "說明"],
           rows=tbl_rows,
-          row_h=Inches(0.4),
+          row_h=Inches(0.38),
           cell_size=Pt(11))
 
-    # IP blacklist config
-    bl_y = BODY_TOP + Inches(3.32)
+    # IP blacklist: table height = 8 rows * 0.38 = 3.04"
+    bl_y = BODY_TOP + Inches(3.16)
     blacklist_code = (
         "# mcp/ip_blacklist.txt\n"
         "# 每行一個 IP，# 開頭為註解\n"
-        "# 空白檔案 = 不限制\n"
+        "# 空白檔案 = 不限制任何 IP\n"
         "203.0.113.10\n"
         "198.51.100.42"
     )
-    code_block(slide, R, bl_y, HW, Inches(1.55), blacklist_code, "IP 黑名單設定")
+    code_block(slide, R, bl_y, HW, Inches(1.48), blacklist_code, "IP 黑名單設定")
 
     # Restricted endpoints note
-    note_y = bl_y + Inches(1.66)
-    card(slide, R, note_y, HW, Inches(0.62),
+    note_y = bl_y + Inches(1.59)
+    card(slide, R, note_y, HW, Inches(0.65),
          body="黑名單 IP 無法存取：/docs · /keywords · /restored\n檔案即時生效，無需重啟 server",
          body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d),
          border=DANGER)
 
-    txtbox(slide, ML, Inches(6.55), CW, Inches(0.3),
+    txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
            "github.com/jason3e7/kw-filter",
            size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
 
