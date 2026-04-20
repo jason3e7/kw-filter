@@ -11,3 +11,4 @@ mapping*.json
 results*.json
 *.pptx
 mcp/storage/
+mcp/restored/

@@ -33,12 +33,14 @@ from kw_tools import cmd_replace, cmd_restore  # noqa: E402
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-MCP_DIR     = Path(__file__).parent
-STORAGE     = MCP_DIR / "storage"
-MAPPING_FILE = STORAGE / "_mapping.json"   # global accumulated mapping
+MCP_DIR       = Path(__file__).parent
+STORAGE       = MCP_DIR / "storage"           # tokenised uploads (visible via list_files)
+RESTORED      = MCP_DIR / "restored"          # restore output (NOT visible via list_files)
+MAPPING_FILE  = STORAGE / "_mapping.json"     # global accumulated mapping
 KEYWORDS_FILE = Path(os.environ.get("KW_KEYWORDS_FILE", MCP_DIR / "keywords.txt"))
 
 STORAGE.mkdir(exist_ok=True)
+RESTORED.mkdir(exist_ok=True)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -203,15 +205,13 @@ def do_restore(body: RestoreBody):
     """
     Pass the AI's response (containing [[KW_...]] tokens) here.
     Uses the global mapping built from all previous uploads.
-    Returns the restored content and stores it.
+    Restored file is saved separately and is NOT visible via GET /files.
     """
     restored = _run_restore(body.name, body.content)
-    meta = _store(f"restored_{body.name}", restored)
-    return {
-        "file_id": meta["file_id"],
-        "name":    meta["name"],
-        "content": restored.decode("utf-8"),
-    }
+    out_name  = f"restored_{body.name}"
+    out_path  = RESTORED / out_name
+    out_path.write_bytes(restored)
+    return {"success": True, "name": out_name}
 
 
 # ── Keywords management ───────────────────────────────────────────────────────

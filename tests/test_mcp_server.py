@@ -29,14 +29,15 @@ KEYWORDS = "alice@corp.com\nSecret123\nacme-internal\n"
 
 @pytest.fixture(autouse=True)
 def isolated_storage(tmp_path, monkeypatch):
-    """Each test gets a clean storage dir, a temp keywords.txt, and a fresh mapping."""
-    fake_storage = tmp_path / "storage"
-    fake_storage.mkdir()
+    """Each test gets clean storage/restored dirs, a temp keywords.txt, and a fresh mapping."""
+    fake_storage  = tmp_path / "storage";  fake_storage.mkdir()
+    fake_restored = tmp_path / "restored"; fake_restored.mkdir()
     kw_file = tmp_path / "keywords.txt"
     kw_file.write_text(KEYWORDS)
 
-    monkeypatch.setattr(srv, "STORAGE",      fake_storage)
-    monkeypatch.setattr(srv, "MAPPING_FILE", fake_storage / "_mapping.json")
+    monkeypatch.setattr(srv, "STORAGE",       fake_storage)
+    monkeypatch.setattr(srv, "RESTORED",      fake_restored)
+    monkeypatch.setattr(srv, "MAPPING_FILE",  fake_storage / "_mapping.json")
     monkeypatch.setattr(srv, "KEYWORDS_FILE", kw_file)
     yield
 
@@ -137,30 +138,41 @@ class TestRestore:
         fid = client.post("/files/text", json={"name": name, "content": content}).json()["file_id"]
         return fid, client.get(f"/files/{fid}").text
 
-    def test_restore_recovers_original_value(self):
+    def test_restore_returns_success_and_name_only(self):
+        """Response must NOT contain file content."""
         _, tokenised = self._upload_and_get_tokenised("contact: alice@corp.com")
-        r = client.post("/restore", json={"name": "out.txt", "content": tokenised})
-        assert r.status_code == 200
-        assert "alice@corp.com" in r.json()["content"]
-        assert "[[KW_" not in r.json()["content"]
+        data = client.post("/restore", json={"name": "out.txt", "content": tokenised}).json()
+        assert data["success"] is True
+        assert "restored_out.txt" == data["name"]
+        assert "content" not in data
 
-    def test_restore_returns_content_and_file_id(self):
+    def test_restore_saves_to_restored_dir(self, monkeypatch):
+        """Restored file must land in RESTORED, not STORAGE."""
+        import server as srv
         _, tokenised = self._upload_and_get_tokenised("pass: Secret123")
-        r = client.post("/restore", json={"name": "out.txt", "content": tokenised})
-        data = r.json()
-        assert "content" in data
-        assert "file_id" in data
-        assert "name" in data
+        client.post("/restore", json={"name": "out.txt", "content": tokenised})
+        restored_file = srv.RESTORED / "restored_out.txt"
+        assert restored_file.exists()
+        assert "Secret123" in restored_file.read_text(encoding="utf-8")
+
+    def test_restore_not_visible_in_list_files(self):
+        """list_files must NOT expose restored files."""
+        _, tokenised = self._upload_and_get_tokenised("key: Secret123")
+        client.post("/restore", json={"name": "secret_out.txt", "content": tokenised})
+        names = [f["name"] for f in client.get("/files").json()]
+        assert not any("restored_" in n for n in names)
 
     def test_restore_without_prior_upload_returns_422(self):
         r = client.post("/restore", json={"name": "out.txt", "content": "[[KW_AAAABBBB]]"})
         assert r.status_code == 422
 
-    def test_restore_roundtrip_exact_match(self):
+    def test_restore_roundtrip_content_correct(self, monkeypatch):
+        """File written to RESTORED must contain the original values."""
+        import server as srv
         original = "user: alice@corp.com  key: Secret123  org: acme-internal"
         _, tokenised = self._upload_and_get_tokenised(original)
-        r = client.post("/restore", json={"name": "out.txt", "content": tokenised})
-        assert r.json()["content"] == original
+        client.post("/restore", json={"name": "check.txt", "content": tokenised})
+        assert (srv.RESTORED / "restored_check.txt").read_text() == original
 
 
 # ── Global mapping accumulation ───────────────────────────────────────────────
@@ -168,8 +180,8 @@ class TestRestore:
 class TestGlobalMapping:
     """Mapping from multiple uploads should all be restorable."""
 
-    def test_two_files_share_mapping(self):
-        # Upload two different files
+    def test_two_files_share_mapping(self, monkeypatch):
+        import server as srv
         fid_a = client.post("/files/text", json={
             "name": "a.txt", "content": "from: alice@corp.com"
         }).json()["file_id"]
@@ -180,11 +192,10 @@ class TestGlobalMapping:
         tok_a = client.get(f"/files/{fid_a}").text
         tok_b = client.get(f"/files/{fid_b}").text
 
-        # Combine both tokenised outputs (simulate AI processing both)
         combined = tok_a + "\n" + tok_b
-        r = client.post("/restore", json={"name": "combined.txt", "content": combined})
-        restored = r.json()["content"]
+        client.post("/restore", json={"name": "combined.txt", "content": combined})
 
+        restored = (srv.RESTORED / "restored_combined.txt").read_text(encoding="utf-8")
         assert "alice@corp.com" in restored
         assert "Secret123" in restored
         assert "[[KW_" not in restored
@@ -218,9 +229,11 @@ class TestEndToEnd:
         )
 
         # Step 4: restore
+        import server as srv
         r = client.post("/restore", json={"name": "test.ts", "content": ai_output})
-        final = r.json()["content"]
+        assert r.json()["success"] is True
 
+        final = (srv.RESTORED / "restored_test.ts").read_text(encoding="utf-8")
         assert "alice@corp.com" in final
         assert "acme-internal" in final
         assert "[[KW_" not in final
