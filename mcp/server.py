@@ -21,6 +21,10 @@ import tempfile
 import uuid
 from pathlib import Path
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -41,6 +45,11 @@ KEYWORDS_FILE = Path(os.environ.get("KW_KEYWORDS_FILE", MCP_DIR / "keywords.txt"
 
 STORAGE.mkdir(exist_ok=True)
 RESTORED.mkdir(exist_ok=True)
+
+# ── IP restriction ────────────────────────────────────────────────────────────
+# KW_ALLOWED_IPS=127.0.0.1,10.0.0.5  (empty = no restriction)
+ALLOWED_IPS: set[str] = set(filter(None, os.environ.get("KW_ALLOWED_IPS", "").split(",")))
+_RESTRICTED = ("/docs", "/openapi.json", "/redoc", "/keywords", "/restored")
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -131,6 +140,19 @@ def _run_restore(name: str, content: str) -> bytes:
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
+class _IPGuard(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        if ALLOWED_IPS and any(request.url.path.startswith(p) for p in _RESTRICTED):
+            ip = (
+                request.headers.get("X-Real-IP")
+                or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+                or (request.client.host if request.client else "")
+            )
+            if ip not in ALLOWED_IPS:
+                return Response("Forbidden", status_code=403)
+        return await call_next(request)
+
+
 app = FastAPI(
     title="kw-filter Server",
     description=(
@@ -140,6 +162,7 @@ app = FastAPI(
     ),
     version="2.0.0",
 )
+app.add_middleware(_IPGuard)
 
 
 # ── File endpoints ────────────────────────────────────────────────────────────
@@ -212,6 +235,27 @@ def do_restore(body: RestoreBody):
     out_path  = RESTORED / out_name
     out_path.write_bytes(restored)
     return {"success": True, "name": out_name}
+
+
+# ── Restored file access ─────────────────────────────────────────────────────
+
+@app.get("/restored", summary="List restored files")
+def list_restored():
+    return [
+        {"name": f.name, "size": f.stat().st_size}
+        for f in sorted(RESTORED.iterdir()) if f.is_file()
+    ]
+
+
+@app.get("/restored/{name}", summary="Download a restored file")
+def get_restored(name: str):
+    fp = RESTORED / name
+    if not fp.exists():
+        raise HTTPException(404, f"{name!r} not found in restored")
+    try:
+        return PlainTextResponse(fp.read_text(encoding="utf-8"))
+    except UnicodeDecodeError:
+        raise HTTPException(422, "File is binary; cannot return as text")
 
 
 # ── Keywords management ───────────────────────────────────────────────────────
