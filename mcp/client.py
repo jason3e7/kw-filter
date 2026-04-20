@@ -3,8 +3,10 @@ kw-filter MCP Client (stdio server for Claude Code)
 ====================================================
 Three tools:
   list_files    — list tokenised files available on the server
-  get_files     — get auto-replaced (tokenised) content, safe to send to AI
-  upload_files  — upload AI output, auto-restored to original values
+  get_files     — download auto-replaced file to local filesystem + return content
+  upload_files  — send AI output to server for restore, save result locally
+
+Files are written to KW_WORK_DIR (default: current working directory).
 
 Claude Code config  (~/.claude.json  or  .claude/settings.json):
 
@@ -13,24 +15,33 @@ Claude Code config  (~/.claude.json  or  .claude/settings.json):
         "kw-filter": {
           "command": "python3",
           "args": ["/path/to/kw-filter/mcp/client.py"],
-          "env": { "KW_SERVER_URL": "http://localhost:8000" }
+          "env": {
+            "KW_SERVER_URL": "http://localhost:8000",
+            "KW_WORK_DIR":   "/path/to/your/project"
+          }
         }
       }
     }
 
 Environment:
     KW_SERVER_URL   URL of the running server.py  (default: http://localhost:8000)
+    KW_WORK_DIR     Directory where local files are read/written (default: cwd)
 """
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
 import httpx
 from mcp.server.fastmcp import FastMCP
 
 SERVER_URL = os.environ.get("KW_SERVER_URL", "http://localhost:8000").rstrip("/")
+WORK_DIR   = Path(os.environ.get("KW_WORK_DIR", Path.cwd())).expanduser().resolve()
 
 mcp = FastMCP("kw-filter")
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get(path: str) -> httpx.Response:
     r = httpx.get(f"{SERVER_URL}{path}", timeout=30)
@@ -50,8 +61,8 @@ def _post(path: str, payload: dict) -> httpx.Response:
 def list_files() -> list[dict]:
     """List all files stored on the kw-filter server.
 
-    Each file has already been processed with replace — its sensitive values
-    are replaced with [[KW_...]] tokens.  Use get_files() to read the content.
+    Each entry has already been processed — sensitive values are replaced with
+    [[KW_...]] tokens.  Use get_files() to download and read one.
 
     Returns a list of {file_id, name, size, tokens_created}.
     """
@@ -60,37 +71,60 @@ def list_files() -> list[dict]:
 
 @mcp.tool()
 def get_files(file_id: str) -> str:
-    """Get the tokenised content of a stored file.
+    """Download the tokenised version of a file to the local filesystem.
 
-    The content has had all sensitive keywords replaced with [[KW_...]] tokens,
-    so it is safe to include in prompts or send to any AI service.
+    The file contains [[KW_...]] tokens in place of sensitive values — safe
+    to include in any AI prompt.  A local copy is written so you can also
+    inspect or edit it outside this conversation.
 
     Args:
         file_id: ID from list_files()
 
     Returns:
-        Tokenised file content — use this as context for the AI.
+        Local file path + full tokenised content.
     """
-    return _get(f"/files/{file_id}").text
+    # Resolve original filename from the file listing
+    files = _get("/files").json()
+    meta  = next((f for f in files if f["file_id"] == file_id), None)
+    if meta is None:
+        raise ValueError(f"file_id {file_id!r} not found on server")
+
+    content   = _get(f"/files/{file_id}").text
+    local_path = WORK_DIR / f"tokenized_{meta['name']}"
+    local_path.write_text(content, encoding="utf-8")
+
+    return (
+        f"Tokenised file saved to: {local_path}\n"
+        f"Tokens: {meta.get('tokens_created', '?')}\n"
+        f"\n{content}"
+    )
 
 
 @mcp.tool()
 def upload_files(name: str, content: str) -> str:
-    """Upload AI-generated content and restore original values automatically.
+    """Send AI-generated content to the server for restore, save result locally.
 
-    Use this after the AI has produced output that contains [[KW_...]] tokens.
-    The server replaces every token with its original value using the stored
-    mapping, so the result is ready to use directly.
+    Use this after the AI has produced output containing [[KW_...]] tokens.
+    The server substitutes every token with its original value, and the
+    restored file is written to your local KW_WORK_DIR.
 
     Args:
         name:    filename for the restored output, e.g. "playwright_test.ts"
         content: AI response text that contains [[KW_...]] tokens
 
     Returns:
-        Fully restored content with real values substituted back in.
+        Local file path of the restored file + its full content.
     """
     data = _post("/restore", {"name": name, "content": content}).json()
-    return data["content"]
+
+    restored_content = data["content"]
+    local_path = WORK_DIR / data["name"]
+    local_path.write_text(restored_content, encoding="utf-8")
+
+    return (
+        f"Restored file saved to: {local_path}\n"
+        f"\n{restored_content}"
+    )
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
