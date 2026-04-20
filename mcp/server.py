@@ -46,10 +46,17 @@ KEYWORDS_FILE = Path(os.environ.get("KW_KEYWORDS_FILE", MCP_DIR / "keywords.txt"
 STORAGE.mkdir(exist_ok=True)
 RESTORED.mkdir(exist_ok=True)
 
-# ── IP restriction ────────────────────────────────────────────────────────────
-# KW_ALLOWED_IPS=127.0.0.1,10.0.0.5  (empty = no restriction)
-ALLOWED_IPS: set[str] = set(filter(None, os.environ.get("KW_ALLOWED_IPS", "").split(",")))
+# ── IP blacklist ──────────────────────────────────────────────────────────────
+# mcp/ip_blacklist.txt — one IP per line; lines starting with # are comments
+IP_BLACKLIST_FILE = MCP_DIR / "ip_blacklist.txt"
 _RESTRICTED = ("/docs", "/openapi.json", "/redoc", "/keywords", "/restored")
+
+
+def _load_blacklist() -> set[str]:
+    if not IP_BLACKLIST_FILE.exists():
+        return set()
+    lines = IP_BLACKLIST_FILE.read_text(encoding="utf-8").splitlines()
+    return {l.strip() for l in lines if l.strip() and not l.startswith("#")}
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -142,14 +149,16 @@ def _run_restore(name: str, content: str) -> bytes:
 
 class _IPGuard(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        if ALLOWED_IPS and any(request.url.path.startswith(p) for p in _RESTRICTED):
-            ip = (
-                request.headers.get("X-Real-IP")
-                or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-                or (request.client.host if request.client else "")
-            )
-            if ip not in ALLOWED_IPS:
-                return Response("Forbidden", status_code=403)
+        if any(request.url.path.startswith(p) for p in _RESTRICTED):
+            blacklist = _load_blacklist()
+            if blacklist:
+                ip = (
+                    request.headers.get("X-Real-IP")
+                    or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+                    or (request.client.host if request.client else "")
+                )
+                if ip in blacklist:
+                    return Response("Forbidden", status_code=403)
         return await call_next(request)
 
 

@@ -1,0 +1,8 @@
+# IP Blacklist for kw-filter server
+# One IP address per line.
+# Lines starting with # are ignored.
+# Blocked IPs cannot access: /docs, /openapi.json, /redoc, /keywords, /restored
+#
+# Example:
+# 203.0.113.10
+# 198.51.100.42
