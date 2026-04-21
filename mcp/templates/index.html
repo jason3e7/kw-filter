@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kw-filter</title>
+<style>
+:root {
+  --bg:      #0f172a;
+  --bg2:     #1e293b;
+  --bg3:     #09111e;
+  --accent:  #4ade80;
+  --danger:  #f87171;
+  --warn:    #fbbf24;
+  --blue:    #60a5fa;
+  --purple:  #c084fc;
+  --muted:   #94a3b8;
+  --white:   #f1f5f9;
+  --border:  #334155;
+  --code-fg: #a5f3fc;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--white); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; font-size: 14px; }
+
+/* ── Header ── */
+header {
+  background: var(--bg2); border-bottom: 2px solid var(--accent);
+  padding: 0.9rem 1.75rem; display: flex; align-items: center; gap: 1rem;
+  position: sticky; top: 0; z-index: 100;
+}
+header h1 { color: var(--accent); font-size: 1.3rem; font-weight: 800; letter-spacing: -0.3px; }
+header .sub { color: var(--muted); font-size: 0.8rem; }
+.server-badge {
+  margin-left: auto; background: rgba(74,222,128,0.1); border: 1px solid var(--accent);
+  color: var(--accent); font-size: 0.75rem; padding: 0.25rem 0.65rem; border-radius: 999px;
+}
+
+/* ── Layout ── */
+.layout { display: grid; grid-template-columns: 380px 1fr 1fr; gap: 1.25rem; padding: 1.25rem 1.5rem; max-width: 1400px; margin: 0 auto; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .layout { grid-template-columns: 1fr; } }
+
+/* ── Card ── */
+.card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1.1rem 1.15rem;
+}
+.card-title {
+  font-size: 0.85rem; font-weight: 700; color: var(--accent); letter-spacing: 0.3px;
+  margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.5rem;
+}
+.card-title .count {
+  margin-left: auto; background: rgba(74,222,128,0.12); color: var(--accent);
+  font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+}
+.card-title button.refresh {
+  margin-left: auto; background: var(--border); color: var(--muted);
+  border: none; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 0.72rem;
+  cursor: pointer;
+}
+.card-title button.refresh:hover { color: var(--white); }
+
+/* ── Forms ── */
+label.field { display: block; color: var(--muted); font-size: 0.78rem; margin-bottom: 0.35rem; }
+input[type=text], textarea {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--white); padding: 0.55rem 0.75rem;
+  font-size: 0.85rem; transition: border-color 0.15s;
+}
+input[type=text]:focus, textarea:focus { outline: none; border-color: var(--accent); }
+textarea { font-family: 'Cascadia Code', 'Fira Code', monospace; resize: vertical; min-height: 110px; color: var(--code-fg); }
+.field-row { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; }
+.field-row input { flex: 1; }
+
+/* ── Drop zone ── */
+.drop-zone {
+  border: 2px dashed var(--border); border-radius: 8px; padding: 1.4rem;
+  text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 0.9rem;
+}
+.drop-zone:hover, .drop-zone.over { border-color: var(--accent); background: rgba(74,222,128,0.04); }
+.drop-zone .dz-icon { font-size: 1.8rem; display: block; margin-bottom: 0.35rem; }
+.drop-zone p { color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
+.drop-zone input[type=file] { display: none; }
+
+/* ── Buttons ── */
+.btn { padding: 0.45rem 1.1rem; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+.btn:hover { opacity: 0.88; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn-primary  { background: var(--accent);  color: #0a1a0a; }
+.btn-blue     { background: var(--blue);    color: #0a1220; }
+.btn-danger   { background: var(--danger);  color: #1a0505; }
+.btn-muted    { background: var(--border);  color: var(--white); }
+.btn-purple   { background: var(--purple);  color: #1a0a2a; }
+.btn-sm       { padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+.row-btns     { display: flex; gap: 0.5rem; margin-top: 0.7rem; align-items: center; }
+
+/* ── File list ── */
+.file-list { display: flex; flex-direction: column; gap: 0.45rem; max-height: 400px; overflow-y: auto; }
+.file-list::-webkit-scrollbar { width: 4px; }
+.file-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.file-item {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+  padding: 0.6rem 0.85rem; display: flex; align-items: center; gap: 0.6rem;
+  transition: border-color 0.15s;
+}
+.file-item:hover { border-color: #4a5568; }
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-meta { color: var(--muted); font-size: 0.73rem; margin-top: 0.15rem; }
+.token-count { color: var(--warn); }
+.file-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+
+/* ── Divider ── */
+hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
+.section-label { color: var(--muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.55rem; }
+
+/* ── Empty / loading ── */
+.empty { color: var(--muted); font-size: 0.82rem; text-align: center; padding: 1.2rem 0.5rem; }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast ── */
+#toasts { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999; display: flex; flex-direction: column; gap: 0.45rem; pointer-events: none; }
+.toast {
+  padding: 0.65rem 1.1rem; border-radius: 7px; font-size: 0.82rem;
+  animation: slideUp 0.2s ease; max-width: 300px; pointer-events: auto;
+}
+.toast-ok  { background: rgba(74,222,128,0.18); border: 1px solid var(--accent); color: var(--accent); }
+.toast-err { background: rgba(248,113,113,0.18); border: 1px solid var(--danger); color: var(--danger); }
+@keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── Keywords ── */
+#kw-area { min-height: 160px; }
+#kw-stat  { color: var(--muted); font-size: 0.78rem; }
+
+/* ── Restore ── */
+#restore-content { min-height: 130px; }
+.restore-result {
+  margin-top: 0.75rem; background: var(--bg3); border: 1px solid var(--accent);
+  border-radius: 6px; padding: 0.75rem; font-family: monospace; font-size: 0.8rem;
+  color: var(--code-fg); white-space: pre-wrap; max-height: 180px; overflow-y: auto;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ kw-filter</h1>
+  <span class="sub">關鍵字過濾 · AI 安全代理 · 還原</span>
+  <span class="server-badge" id="srv-badge">● 連線中…</span>
+</header>
+
+<div class="layout">
+
+  <!-- ── 左欄：上傳 + Keywords ── -->
+  <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+    <div class="card">
+      <div class="card-title">📤 上傳檔案</div>
+
+      <div class="drop-zone" id="dz">
+        <input type="file" id="file-input" multiple>
+        <span class="dz-icon">📂</span>
+        <p>點擊或拖曳檔案到這裡<br>上傳後自動 replace 敏感關鍵字</p>
+      </div>
+
+      <div class="section-label">或貼上文字</div>
+      <div class="field-row">
+        <input type="text" id="txt-name" placeholder="檔名，例如：report.txt">
+      </div>
+      <textarea id="txt-content" placeholder="貼上包含敏感資訊的文字…"></textarea>
+      <div class="row-btns">
+        <button class="btn btn-primary" onclick="uploadText()">上傳文字</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔑 Keywords 管理</div>
+      <label class="field">keywords.txt（每行一個關鍵字，# 開頭為註解）</label>
+      <textarea id="kw-area" placeholder="載入中…"></textarea>
+      <div class="row-btns">
+        <button class="btn btn-primary" onclick="saveKw()">儲存</button>
+        <button class="btn btn-muted" onclick="loadKw()">重新載入</button>
+        <span id="kw-stat"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔄 還原 AI 輸出</div>
+      <label class="field">將含有 [[KW_...]] token 的 AI 輸出貼到這裡</label>
+      <div class="field-row">
+        <input type="text" id="restore-name" placeholder="輸出檔名，例如：test.ts">
+      </div>
+      <textarea id="restore-content" placeholder="貼上 AI 輸出…"></textarea>
+      <div class="row-btns">
+        <button class="btn btn-purple" onclick="doRestore()">還原並儲存</button>
+      </div>
+      <pre class="restore-result" id="restore-result"></pre>
+    </div>
+
+  </div>
+
+  <!-- ── 中欄：Tokenised 檔案 ── -->
+  <div class="card">
+    <div class="card-title">
+      📁 已上傳檔案（tokenised）
+      <button class="refresh" onclick="loadFiles()">↻ 重新整理</button>
+    </div>
+    <div class="file-list" id="file-list">
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+  <!-- ── 右欄：Restored 檔案 ── -->
+  <div class="card">
+    <div class="card-title">
+      ✅ 已還原檔案
+      <button class="refresh" onclick="loadRestored()">↻ 重新整理</button>
+    </div>
+    <div class="file-list" id="restored-list">
+      <div class="empty"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, ok = true) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function fmt(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+// ── Server status ─────────────────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    await fetch('/files');
+    document.getElementById('srv-badge').textContent = '● 已連線';
+    document.getElementById('srv-badge').style.color = 'var(--accent)';
+  } catch {
+    document.getElementById('srv-badge').textContent = '● 無法連線';
+    document.getElementById('srv-badge').style.color = 'var(--danger)';
+  }
+}
+
+// ── Files ────────────────────────────────────────────────────────────────────
+async function loadFiles() {
+  const list = document.getElementById('file-list');
+  list.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+  try {
+    const files = await fetch('/files').then(r => r.json());
+    if (!files.length) { list.innerHTML = '<div class="empty">尚無檔案</div>'; return; }
+    list.innerHTML = '';
+    files.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <div class="file-info">
+          <div class="file-name" title="${esc(f.name)}">${esc(f.name)}</div>
+          <div class="file-meta">${fmt(f.size)} · <span class="token-count">[[KW_...]] × ${f.tokens_created ?? '?'}</span></div>
+        </div>
+        <div class="file-actions">
+          <button class="btn btn-blue btn-sm" onclick="dlFile('${f.file_id}','${esc(f.name)}')">下載</button>
+          <button class="btn btn-danger btn-sm" onclick="delFile('${f.file_id}', this)">刪除</button>
+        </div>`;
+      list.appendChild(item);
+    });
+  } catch { list.innerHTML = '<div class="empty" style="color:var(--danger)">載入失敗</div>'; }
+}
+
+async function dlFile(id, name) {
+  try {
+    const text = await fetch('/files/' + id).then(r => { if(!r.ok) throw r; return r.text(); });
+    download(name, text);
+  } catch { toast('下載失敗', false); }
+}
+
+async function delFile(id, btn) {
+  if (!confirm('確認刪除？')) return;
+  btn.disabled = true;
+  const r = await fetch('/files/' + id, { method: 'DELETE' });
+  if (r.ok) { toast('已刪除'); loadFiles(); }
+  else { toast('刪除失敗', false); btn.disabled = false; }
+}
+
+// ── Restored ─────────────────────────────────────────────────────────────────
+async function loadRestored() {
+  const list = document.getElementById('restored-list');
+  list.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+  try {
+    const files = await fetch('/restored').then(r => r.json());
+    if (!files.length) { list.innerHTML = '<div class="empty">尚無還原檔案</div>'; return; }
+    list.innerHTML = '';
+    files.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <div class="file-info">
+          <div class="file-name" title="${esc(f.name)}">${esc(f.name)}</div>
+          <div class="file-meta">${fmt(f.size)}</div>
+        </div>
+        <div class="file-actions">
+          <button class="btn btn-blue btn-sm" onclick="dlRestored('${esc(f.name)}')">下載</button>
+          <button class="btn btn-danger btn-sm" onclick="delRestored('${esc(f.name)}', this)">刪除</button>
+        </div>`;
+      list.appendChild(item);
+    });
+  } catch { list.innerHTML = '<div class="empty" style="color:var(--danger)">載入失敗</div>'; }
+}
+
+async function dlRestored(name) {
+  try {
+    const text = await fetch('/restored/' + name).then(r => { if(!r.ok) throw r; return r.text(); });
+    download(name, text);
+  } catch { toast('下載失敗', false); }
+}
+
+async function delRestored(name, btn) {
+  if (!confirm('確認刪除 ' + name + '？')) return;
+  btn.disabled = true;
+  const r = await fetch('/restored/' + name, { method: 'DELETE' });
+  if (r.ok) { toast('已刪除'); loadRestored(); }
+  else { toast('刪除失敗', false); btn.disabled = false; }
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+const dz = document.getElementById('dz');
+dz.addEventListener('click', () => document.getElementById('file-input').click());
+document.getElementById('file-input').addEventListener('change', async e => {
+  for (const f of e.target.files) await uploadFile(f);
+  e.target.value = '';
+});
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', async e => {
+  e.preventDefault(); dz.classList.remove('over');
+  for (const f of e.dataTransfer.files) await uploadFile(f);
+});
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch('/files', { method: 'POST', body: fd });
+  if (r.status === 422) { toast(`${file.name}：無關鍵字匹配`, false); return; }
+  if (r.status === 503) { toast('keywords.txt 不存在', false); return; }
+  if (!r.ok) { toast(`上傳失敗 ${r.status}`, false); return; }
+  const d = await r.json();
+  toast(`${d.name} 上傳成功，${d.tokens_created} 個 token`);
+  loadFiles();
+}
+
+async function uploadText() {
+  const name    = document.getElementById('txt-name').value.trim() || 'paste.txt';
+  const content = document.getElementById('txt-content').value;
+  if (!content.trim()) { toast('請輸入內容', false); return; }
+  const r = await fetch('/files/text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content })
+  });
+  if (r.status === 422) { toast('無關鍵字匹配', false); return; }
+  if (r.status === 503) { toast('keywords.txt 不存在', false); return; }
+  if (!r.ok) { toast('上傳失敗 ' + r.status, false); return; }
+  const d = await r.json();
+  toast(`${d.name} 上傳成功，${d.tokens_created} 個 token`);
+  document.getElementById('txt-content').value = '';
+  loadFiles();
+}
+
+// ── Keywords ──────────────────────────────────────────────────────────────────
+async function loadKw() {
+  const stat = document.getElementById('kw-stat');
+  stat.innerHTML = '<span class="spinner"></span>';
+  try {
+    const text = await fetch('/keywords').then(r => { if(!r.ok) throw r; return r.text(); });
+    document.getElementById('kw-area').value = text;
+    const n = text.split('\n').filter(l => l.trim() && !l.startsWith('#')).length;
+    stat.textContent = n + ' 個關鍵字';
+  } catch {
+    stat.textContent = '無法讀取';
+    document.getElementById('kw-area').placeholder = '找不到 keywords.txt';
+  }
+}
+
+async function saveKw() {
+  const content = document.getElementById('kw-area').value;
+  const r = await fetch('/keywords', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'keywords.txt', content })
+  });
+  if (r.ok) {
+    const d = await r.json();
+    document.getElementById('kw-stat').textContent = d.keywords_count + ' 個關鍵字';
+    toast('Keywords 已儲存');
+  } else toast('儲存失敗', false);
+}
+
+// ── Restore ───────────────────────────────────────────────────────────────────
+async function doRestore() {
+  const name    = document.getElementById('restore-name').value.trim() || 'output.txt';
+  const content = document.getElementById('restore-content').value;
+  if (!content.trim()) { toast('請輸入內容', false); return; }
+  const r = await fetch('/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content })
+  });
+  if (r.status === 422) { toast('無 mapping 可用，請先上傳檔案', false); return; }
+  if (!r.ok) { toast('還原失敗 ' + r.status, false); return; }
+  const d = await r.json();
+  toast(`已還原 → ${d.name}`);
+  loadRestored();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function download(name, content) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkServer();
+loadFiles();
+loadRestored();
+loadKw();
+</script>
+</body>
+</html>

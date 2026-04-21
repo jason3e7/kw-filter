@@ -29,7 +29,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -174,6 +174,15 @@ app = FastAPI(
 app.add_middleware(_IPGuard)
 
 
+# ── Web UI ───────────────────────────────────────────────────────────────────
+
+_UI_FILE = MCP_DIR / "templates" / "index.html"
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def web_ui():
+    return HTMLResponse(_UI_FILE.read_text(encoding="utf-8"))
+
+
 # ── File endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/files", summary="Upload file (multipart) — auto replace runs immediately")
@@ -265,6 +274,15 @@ def get_restored(name: str):
         return PlainTextResponse(fp.read_text(encoding="utf-8"))
     except UnicodeDecodeError:
         raise HTTPException(422, "File is binary; cannot return as text")
+
+
+@app.delete("/restored/{name}", summary="Delete a restored file")
+def delete_restored(name: str):
+    fp = RESTORED / name
+    if not fp.exists():
+        raise HTTPException(404, f"{name!r} not found in restored")
+    fp.unlink()
+    return {"deleted": name}
 
 
 # ── Keywords management ───────────────────────────────────────────────────────
