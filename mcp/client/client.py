@@ -12,7 +12,7 @@ Claude Code config  (~/.claude.json  or  .claude/settings.json):
       "mcpServers": {
         "kw-filter": {
           "command": "python3",
-          "args": ["/path/to/kw-filter/mcp/client.py"],
+          "args": ["/path/to/kw-filter/mcp/client/client.py"],
           "env": { "KW_SERVER_URL": "http://localhost:8000" }
         }
       }

@@ -1,31 +1,49 @@
 # kw-filter MCP Integration
 
+## Directory Structure
+
+```
+mcp/
+  server/           ← run this on the machine that holds the files
+    server.py
+    requirements.txt   (fastapi, uvicorn, python-multipart)
+    templates/
+      index.html     web UI
+    keywords.txt     create this first
+    ip_blacklist.txt optional IP blocklist
+  client/           ← configure this in Claude Code
+    client.py
+    requirements.txt   (mcp, httpx)
+  requirements.txt  ← installs both (convenience)
+```
+
 ## Architecture
 
 ```
-Browser / curl  ──POST /files──────────────────────────┐
-                                                        ▼
-Claude Code ──stdio──► client.py ──HTTP──► server.py :8000
-                                               │
-                                    auto replace on upload
-                                    auto restore on /restore
+Browser / curl  ──POST /files──────────────────────────────┐
+                                                            ▼
+Claude Code ──stdio──► client/client.py ──HTTP──► server/server.py :8000
+                                                       │
+                                            auto replace on upload
+                                            auto restore on /restore
 ```
-
-| File | Role |
-|---|---|
-| `server.py` | FastAPI — auto replace on upload, auto restore endpoint, web UI |
-| `client.py` | MCP stdio server — 3 tools for Claude Code |
-| `keywords.txt` | One sensitive value per line (**create this first**) |
-| `ip_blacklist.txt` | One blocked IP per line; restricts access to sensitive endpoints |
-| `templates/index.html` | Browser-based management UI |
 
 ## Setup
 
 ```bash
-pip install -r mcp/requirements.txt
+# Server only
+pip install -r mcp/server/requirements.txt
 
+# Client only
+pip install -r mcp/client/requirements.txt
+
+# Everything
+pip install -r mcp/requirements.txt
+```
+
+```bash
 # Create your keywords file
-cat > mcp/keywords.txt << 'EOF'
+cat > mcp/server/keywords.txt << 'EOF'
 alice@corp.com
 Secret123
 acme-internal.com
@@ -33,12 +51,12 @@ sk-live-abc123
 EOF
 
 # Start the server
-python mcp/server.py
+python mcp/server/server.py
 ```
 
-Override keywords path: `KW_KEYWORDS_FILE=/other/path/keywords.txt python mcp/server.py`
+Override keywords path: `KW_KEYWORDS_FILE=/other/path/keywords.txt python mcp/server/server.py`
 
-- **Web UI** → http://localhost:8000
+- **Web UI** → http://localhost:8000  
 - **Interactive API docs** → http://localhost:8000/docs
 
 ---
@@ -124,7 +142,7 @@ To block specific IPs from these endpoints, edit `mcp/ip_blacklist.txt`:
   "mcpServers": {
     "kw-filter": {
       "command": "python3",
-      "args": ["/absolute/path/to/kw-filter/mcp/client.py"],
+      "args": ["/absolute/path/to/kw-filter/mcp/client/client.py"],
       "env": { "KW_SERVER_URL": "http://localhost:8000" }
     }
   }

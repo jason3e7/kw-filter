@@ -196,9 +196,9 @@ Claude Code ──stdio──► mcp/client.py ──HTTP──► mcp/server.py
 **Quick start:**
 
 ```bash
-pip install -r mcp/requirements.txt
-echo "alice@corp.com\nSecret123" > mcp/keywords.txt
-python mcp/server.py
+pip install -r mcp/server/requirements.txt
+echo "alice@corp.com\nSecret123" > mcp/server/keywords.txt
+python mcp/server/server.py
 ```
 
 Add to `~/.claude.json`:
@@ -208,7 +208,7 @@ Add to `~/.claude.json`:
   "mcpServers": {
     "kw-filter": {
       "command": "python3",
-      "args": ["/absolute/path/to/kw-filter/mcp/client.py"],
+      "args": ["/absolute/path/to/kw-filter/mcp/client/client.py"],
       "env": { "KW_SERVER_URL": "http://localhost:8000" }
     }
   }

@@ -1,5 +1,5 @@
 """
-Tests for the redesigned MCP server (mcp/server.py).
+Tests for the redesigned MCP server (mcp/server/server.py).
 
 Design:
   - Upload → auto replace using default keywords.txt
@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent / "mcp"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "mcp" / "server"))
 
 from fastapi.testclient import TestClient
 import server as srv

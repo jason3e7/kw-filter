@@ -10,5 +10,5 @@ build/
 mapping*.json
 results*.json
 *.pptx
-mcp/storage/
-mcp/restored/
+mcp/server/storage/
+mcp/server/restored/
