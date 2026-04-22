@@ -870,25 +870,27 @@ def s14b_mcp(prs):
     code_block(slide, ML, tools_y + Inches(2.21), HW, Inches(1.80), cfg, "Claude Code 設定")
 
     # ── Right column ──────────────────────────────────────────────────────────
-    # Endpoints table — 7 data rows at 0.38" each
+    # Endpoints table — 9 data rows at 0.35" each
     tbl_rows = [
+        ["GET  /",                   "Web UI — 瀏覽器管理介面"],
         ["POST /files  /files/text", "上傳並自動 replace，回傳 file_id"],
         ["GET  /files",              "列出已 tokenised 的檔案"],
         ["GET  /files/{id}",         "取得 tokenised 內容"],
+        ["DELETE /files/{id}",       "刪除 tokenised 檔案"],
         ["POST /restore",            "還原 token → 原始值，存入 restored/"],
         ["GET  /restored",           "列出所有還原後的檔案"],
-        ["GET  /restored/{name}",    "下載還原後的檔案"],
+        ["GET|DELETE /restored/{n}", "下載／刪除還原後的檔案"],
         ["GET|PUT /keywords",        "查看／更新 keywords.txt"],
     ]
     table(slide, R, BODY_TOP, HW,
-          col_fracs=[1.7, 2.3],
+          col_fracs=[1.8, 2.2],
           headers=["Endpoint", "說明"],
           rows=tbl_rows,
-          row_h=Inches(0.38),
-          cell_size=Pt(11))
+          row_h=Inches(0.35),
+          cell_size=Pt(10.5))
 
-    # IP blacklist: table height = 8 rows * 0.38 = 3.04"
-    bl_y = BODY_TOP + Inches(3.16)
+    # IP blacklist: table height = 10 rows * 0.35 = 3.50"
+    bl_y = BODY_TOP + Inches(3.62)
     blacklist_code = (
         "# mcp/ip_blacklist.txt\n"
         "# 每行一個 IP，# 開頭為註解\n"
@@ -896,14 +898,114 @@ def s14b_mcp(prs):
         "203.0.113.10\n"
         "198.51.100.42"
     )
-    code_block(slide, R, bl_y, HW, Inches(1.48), blacklist_code, "IP 黑名單設定")
+    code_block(slide, R, bl_y, HW, Inches(1.38), blacklist_code, "IP 黑名單設定")
 
     # Restricted endpoints note
-    note_y = bl_y + Inches(1.59)
-    card(slide, R, note_y, HW, Inches(0.65),
+    note_y = bl_y + Inches(1.49)
+    card(slide, R, note_y, HW, Inches(0.62),
          body="黑名單 IP 無法存取：/docs · /keywords · /restored\n檔案即時生效，無需重啟 server",
          body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d),
          border=DANGER)
+
+    txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
+           "github.com/jason3e7/kw-filter",
+           size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
+
+
+def s14c_webui(prs):
+    slide = blank(prs)
+    heading(slide, "Web UI：瀏覽器管理介面（GET /）")
+
+    CARD_BG   = RGBColor(0x12, 0x20, 0x18)
+    CARD_BD   = RGBColor(0x1e, 0x3a, 0x28)
+    cw = Inches(2.77)   # 2 cards per column, gap 0.15"
+    ch = Inches(1.52)
+    gap = Inches(0.15)
+
+    features = [
+        ("📤", "上傳檔案",
+         "拖曳或選擇本機檔案（支援多選）\n"
+         "或直接貼上文字內容\n"
+         "上傳後自動執行 replace"),
+        ("📁", "Tokenised 檔案",
+         "列出所有已上傳的檔案\n"
+         "顯示 token 替換數量\n"
+         "可下載或刪除"),
+        ("✅", "已還原檔案",
+         "列出所有 restore 完成的檔案\n"
+         "可下載原始內容或刪除\n"
+         "（不出現在 list_files）"),
+        ("🔄", "還原表單",
+         "貼上含 [[KW_...]] 的 AI 輸出\n"
+         "一鍵 restore 並存檔\n"
+         "無需 CLI 或 MCP"),
+        ("🔑", "Keywords 管理",
+         "在瀏覽器中查看和編輯\n"
+         "keywords.txt 內容\n"
+         "儲存後立即生效"),
+        ("⚡", "純 HTML / JS",
+         "無框架、無需額外安裝\n"
+         "由 server.py 直接服務\n"
+         "深色主題，響應式佈局"),
+    ]
+
+    col_x = [ML, ML + cw + gap]
+    row_y = [BODY_TOP, BODY_TOP + ch + gap, BODY_TOP + 2 * (ch + gap)]
+
+    for i, (icon, title, body) in enumerate(features):
+        cx = col_x[i % 2]
+        cy = row_y[i // 2]
+
+        shape = rect(slide, cx, cy, cw, ch, fill_color=CARD_BG, border_color=CARD_BD, border_pt=1.5)
+        tf = shape.text_frame; tf.word_wrap = True
+        _set_txbody_margins(tf._txBody, l=Pt(12), r=Pt(10), t=Pt(10), b=Pt(8))
+
+        p0 = tf.paragraphs[0]
+        ri = p0.add_run(); ri.text = icon + "  "
+        ri.font.size = Pt(16); ri.font.name = "Segoe UI Emoji"
+        rt = p0.add_run(); rt.text = title
+        rt.font.size = Pt(14); rt.font.bold = True
+        rt.font.color.rgb = ACCENT; rt.font.name = "Noto Sans TC"
+
+        p1 = tf.add_paragraph(); p1.space_before = Pt(6)
+        rb = p1.add_run(); rb.text = body
+        rb.font.size = Pt(12); rb.font.color.rgb = WHITE; rb.font.name = "Noto Sans TC"
+
+    # ── Right column: access + workflow ──────────────────────────────────────
+    rx = ML + 2 * cw + 2 * gap + Inches(0.05)
+    rw = W - rx - ML
+
+    access_code = (
+        "# 啟動 server 後直接開啟瀏覽器\n"
+        "python mcp/server.py\n"
+        "# → http://localhost:8000"
+    )
+    code_block(slide, rx, BODY_TOP, rw, Inches(1.10), access_code, "存取方式", label_color=ACCENT)
+
+    # Workflow steps
+    steps = [
+        ("① 上傳",    "拖曳或貼上文字 → 自動 replace"),
+        ("② 複製",    "下載或複製 tokenised 內容"),
+        ("③ 送 AI",   "含 [[KW_...]] 的安全內容送入 AI"),
+        ("④ 還原",    "貼上 AI 輸出 → 一鍵 restore"),
+        ("⑤ 下載",    "從「已還原檔案」取得最終結果"),
+    ]
+    wy = BODY_TOP + Inches(1.22)
+    txtbox(slide, rx, wy, rw, Inches(0.28), "典型工作流程",
+           size=Pt(11), color=MUTED)
+    wy += Inches(0.30)
+    for step, desc in steps:
+        shape = rect(slide, rx, wy, rw, Inches(0.56),
+                     fill_color=RGBColor(0x0e, 0x1c, 0x12), border_color=BORDER)
+        tf = shape.text_frame; tf.word_wrap = True
+        _set_txbody_margins(tf._txBody, l=Pt(10), r=Pt(8), t=Pt(7), b=Pt(7))
+        p = tf.paragraphs[0]
+        rs = p.add_run(); rs.text = step + "  "
+        rs.font.size = Pt(12); rs.font.bold = True
+        rs.font.color.rgb = ACCENT; rs.font.name = "Noto Sans TC"
+        rd = p.add_run(); rd.text = desc
+        rd.font.size = Pt(12); rd.font.color.rgb = WHITE; rd.font.name = "Noto Sans TC"
+        wy += Inches(0.62)
 
     txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
            "github.com/jason3e7/kw-filter",
@@ -999,6 +1101,7 @@ def main():
     s13_why(prs)
     s14_quickstart(prs)
     s14b_mcp(prs)
+    s14c_webui(prs)
     s15_bigquestion(prs)
 
     out = "/home/null/kw-filter/kw-filter.pptx"

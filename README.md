@@ -223,7 +223,9 @@ Three tools become available in Claude Code:
 | `get_files(file_id)` | Get tokenised content — safe to send to any AI |
 | `upload_files(name, content)` | Restore tokens in AI output → save to `mcp/restored/` |
 
-Restored files are accessible via `GET /restored/{name}`. To block specific IPs from sensitive endpoints (`/docs`, `/keywords`, `/restored`), add them to `mcp/ip_blacklist.txt` — one IP per line.
+**Web UI** — open `http://localhost:8000` for a browser-based management interface: upload files, manage tokenised and restored files, edit keywords, and restore AI output — all without the CLI.
+
+Restored files are accessible via `GET /restored/{name}` (and deletable via `DELETE /restored/{name}`). To block specific IPs from sensitive endpoints (`/docs`, `/keywords`, `/restored`), add them to `mcp/ip_blacklist.txt` — one IP per line.
 
 See [`mcp/README.md`](mcp/README.md) for full documentation.
 

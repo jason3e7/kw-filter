@@ -13,10 +13,11 @@ Claude Code ──stdio──► client.py ──HTTP──► server.py :8000
 
 | File | Role |
 |---|---|
-| `server.py` | FastAPI — auto replace on upload, auto restore endpoint |
+| `server.py` | FastAPI — auto replace on upload, auto restore endpoint, web UI |
 | `client.py` | MCP stdio server — 3 tools for Claude Code |
 | `keywords.txt` | One sensitive value per line (**create this first**) |
 | `ip_blacklist.txt` | One blocked IP per line; restricts access to sensitive endpoints |
+| `templates/index.html` | Browser-based management UI |
 
 ## Setup
 
@@ -37,7 +38,24 @@ python mcp/server.py
 
 Override keywords path: `KW_KEYWORDS_FILE=/other/path/keywords.txt python mcp/server.py`
 
-Interactive API docs → http://localhost:8000/docs
+- **Web UI** → http://localhost:8000
+- **Interactive API docs** → http://localhost:8000/docs
+
+---
+
+## Web UI
+
+Open `http://localhost:8000` in a browser for a full management interface:
+
+| Section | Features |
+|---|---|
+| **上傳** | Drag-and-drop or file picker (multi-file); or paste text directly |
+| **Tokenised 檔案** | List all uploaded files with token count; download or delete |
+| **已還原檔案** | List all restored files; download or delete |
+| **還原表單** | Paste AI output with `[[KW_...]]` tokens → restore and save |
+| **Keywords 管理** | View and edit `keywords.txt` in-browser, save changes live |
+
+No installation or login required — the UI is served directly by `server.py`.
 
 ---
 
@@ -65,6 +83,9 @@ curl http://localhost:8000/restored
 
 # Download a restored file
 curl http://localhost:8000/restored/restored_ai_output.txt
+
+# Delete a restored file
+curl -X DELETE http://localhost:8000/restored/restored_ai_output.txt
 
 # View / update keywords
 curl http://localhost:8000/keywords
