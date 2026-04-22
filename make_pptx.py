@@ -1029,38 +1029,33 @@ def s15_bigquestion(prs):
                fill_color=PURPLE, border_color=None)
     div.line.fill.background()
 
-    # 2 × 2 card grid
+    # ── 2 × 2 card grid ───────────────────────────────────────────────────────
     CARD_BG     = RGBColor(0x18, 0x08, 0x2a)
     CARD_BORDER = RGBColor(0x5e, 0x28, 0x8e)
     CARD_TEXT   = RGBColor(0xcb, 0xd5, 0xe1)
+    CARD_HL     = RGBColor(0x1a, 0x06, 0x10)   # danger-tinted bg for token card
+    CARD_HL_BD  = RGBColor(0x9b, 0x1c, 0x3a)
 
-    cw = HW; ch = Inches(1.95); gap_x = GAP; gap_y = Inches(0.2)
+    cw = HW; ch = Inches(1.78); gap_x = GAP; gap_y = Inches(0.18)
     row1_y = Inches(1.92); row2_y = row1_y + ch + gap_y
 
-    cards = [
-        # row 1
-        (ML,  row1_y, "🌙 工作侵入生活",
+    normal_cards = [
+        (ML, row1_y, "🌙 工作侵入生活",
          "AI 讓凌晨兩點整理報告變得「輕鬆」。\n"
          "輕鬆完成，不等於應該完成。\n"
          "工具降低了摩擦，卻也模糊了「下班」這條線。"),
-        (R,   row1_y, "📱 手機 × AI ＝ 永遠在線",
+        (R,  row1_y, "📱 手機 × AI ＝ 永遠在線",
          "手機讓你隨時隨地都能用 AI——\n"
          "通勤、吃飯、睡前都能繼續「生產」。\n"
          "感覺一直在工作，因為你確實一直在工作。"),
-        # row 2
-        (ML,  row2_y, "😰 額度焦慮：全新的壓力",
-         "用完了 → 今天無法繼續，焦慮。\n"
-         "沒用完 → 浪費配額，也焦慮。\n"
-         "一種以前從未存在過的、工具獨有的心理負擔。"),
-        (R,   row2_y, "🧠 決策疲勞轉移",
+        (R,  row2_y, "🧠 決策疲勞轉移",
          "AI 接管了大量判斷，\n"
          "但「要不要用 AI 做這件事」本身就是新的負擔。\n"
          "我們節省了時間，卻多了另一種焦慮。"),
     ]
 
-    for cx, cy, title, body in cards:
-        shape = rect(slide, cx, cy, cw, ch,
-                     fill_color=CARD_BG,
+    for cx, cy, title, body in normal_cards:
+        shape = rect(slide, cx, cy, cw, ch, fill_color=CARD_BG,
                      border_color=CARD_BORDER, border_pt=1.5)
         tf = shape.text_frame; tf.word_wrap = True
         _set_txbody_margins(tf._txBody, l=Pt(12), r=Pt(12), t=Pt(10), b=Pt(8))
@@ -1072,13 +1067,38 @@ def s15_bigquestion(prs):
         r2.font.size = Pt(12.5); r2.font.color.rgb = CARD_TEXT
         r2.font.name = "Noto Sans TC"
 
-    bottom_y = row2_y + ch + Inches(0.18)
-    txtbox(slide, ML, bottom_y, CW, Inches(0.35),
+    # ── Token 週期焦慮（特別強調）────────────────────────────────────────────
+    tc_shape = rect(slide, ML, row2_y, cw, ch,
+                    fill_color=CARD_HL, border_color=CARD_HL_BD, border_pt=2)
+    tc_tf = tc_shape.text_frame; tc_tf.word_wrap = True
+    _set_txbody_margins(tc_tf._txBody, l=Pt(12), r=Pt(12), t=Pt(10), b=Pt(8))
+
+    tc_title = tc_tf.paragraphs[0]
+    tr = tc_title.add_run()
+    tr.text = "😰 Token 週期焦慮"
+    tr.font.size = Pt(14.5); tr.font.bold = True
+    tr.font.color.rgb = DANGER; tr.font.name = "Noto Sans TC"
+
+    for line, color in [
+        ("上班時 → 擔心 token 用完，能省則省", RGBColor(0xff, 0xaa, 0x80)),
+        ("下班後 → 還剩這麼多，放著就是浪費", RGBColor(0x80, 0xcc, 0xff)),
+        ("根本原因：token 有重置週期——",       CARD_TEXT),
+        ("不用完＝損失，用太快＝焦慮",         WARN),
+    ]:
+        p = tc_tf.add_paragraph()
+        p.space_before = Pt(5 if line.startswith("根") else 3)
+        rr = p.add_run(); rr.text = line
+        rr.font.size = Pt(12); rr.font.color.rgb = color
+        rr.font.name = "Noto Sans TC"
+
+    # ── Bottom note ────────────────────────────────────────────────────────────
+    bottom_y = row2_y + ch + Inches(0.2)
+    txtbox(slide, ML, bottom_y, CW, Inches(0.30),
            "幾個沒有標準答案的問題，帶著走——",
-           size=Pt(13), color=MUTED, align=PP_ALIGN.CENTER)
-    txtbox(slide, ML, bottom_y + Inches(0.36), CW, Inches(0.46),
+           size=Pt(12.5), color=MUTED, align=PP_ALIGN.CENTER)
+    txtbox(slide, ML, bottom_y + Inches(0.31), CW, Inches(0.40),
            "你願意為自己設定一個「不用 AI」的時段嗎？  ·  你的邊界，是工具決定的，還是你自己決定的？",
-           size=Pt(14.5), color=WHITE, align=PP_ALIGN.CENTER)
+           size=Pt(14), color=WHITE, align=PP_ALIGN.CENTER)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
