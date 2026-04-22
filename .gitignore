@@ -12,3 +12,5 @@ results*.json
 *.pptx
 mcp/server/storage/
 mcp/server/restored/
+mcp/storage/
+mcp/restored/
