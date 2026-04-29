@@ -323,7 +323,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 <div id="analyze-modal" class="modal hidden">
   <div class="modal-header">
     <button class="back-btn" onclick="closeAnalyzeModal()">← 返回</button>
-    <div class="type-tabs" id="type-tabs"></div>
+    <button class="btn btn-muted btn-sm" id="sel-all-btn" onclick="_toggleSelectAll()">全選</button>
   </div>
   <div class="modal-body" id="analyze-items"></div>
   <div class="modal-footer">
@@ -561,7 +561,6 @@ function download(name, content) {
 
 // ── Analyze modal ─────────────────────────────────────────────────────────────
 let _analyzeItems = [];
-let _activeFilter = null; // null = 全部
 let _pendingUpload = null; // { type:'file', file } | { type:'text', name, content } | null
 
 async function doAnalyze() {
@@ -599,7 +598,6 @@ async function doAnalyzeContent(content, pending, statEl) {
 
 function _openModal() {
   document.getElementById('analyze-modal').classList.remove('hidden');
-  _renderTabs();
   _renderItems();
   _updateCount();
   _renderFooterBtns();
@@ -630,40 +628,25 @@ function closeAnalyzeModal() {
   document.getElementById('analyze-modal').classList.add('hidden');
 }
 
-function _renderTabs() {
-  const types = [...new Set(_analyzeItems.map(i => i.type))];
-  const container = document.getElementById('type-tabs');
-  container.innerHTML = '';
-
-  const mkTab = (label, cls, isActive, onClick) => {
-    const t = document.createElement('div');
-    t.className = `type-tab ${cls}` + (isActive ? ' active' : '');
-    t.textContent = label;
-    t.onclick = onClick;
-    container.appendChild(t);
-  };
-
-  mkTab(`全部 (${_analyzeItems.length})`, 'tab-ALL', _activeFilter === null, () => {
-    _activeFilter = null; _renderTabs(); _renderItems();
+function _toggleSelectAll() {
+  const allSelected = _analyzeItems.every(i => i.selected);
+  _analyzeItems.forEach((item, idx) => {
+    item.selected = !allSelected;
+    const row = document.getElementById(`ai-row-${idx}`);
+    if (row) {
+      row.className = 'analyze-item' + (item.selected ? '' : ' deselected');
+      const cb = row.querySelector('input[type=checkbox]');
+      if (cb) cb.checked = item.selected;
+    }
   });
-  types.forEach(type => {
-    const count = _analyzeItems.filter(i => i.type === type).length;
-    mkTab(`${type} (${count})`, `tab-${type}`, _activeFilter === type, () => {
-      _activeFilter = (_activeFilter === type) ? null : type;
-      _renderTabs(); _renderItems();
-    });
-  });
+  _updateCount();
 }
 
 function _renderItems() {
   const container = document.getElementById('analyze-items');
   container.innerHTML = '';
-  const visible = _activeFilter
-    ? _analyzeItems.filter(i => i.type === _activeFilter)
-    : _analyzeItems;
-  if (!visible.length) { container.innerHTML = '<div class="empty">此類型無結果</div>'; return; }
-  visible.forEach(item => {
-    const idx = _analyzeItems.indexOf(item);
+  if (!_analyzeItems.length) { container.innerHTML = '<div class="empty">無偵測結果</div>'; return; }
+  _analyzeItems.forEach((item, idx) => {
     const value = item.edited !== null ? item.edited : item.value;
     const row = document.createElement('div');
     row.className = 'analyze-item' + (item.selected ? '' : ' deselected');
@@ -727,6 +710,8 @@ function _cancelEdit(idx) {
 function _updateCount() {
   const sel = _analyzeItems.filter(i => i.selected).length;
   document.getElementById('sel-count').textContent = `已選取 ${sel} / ${_analyzeItems.length} 個目標`;
+  const btn = document.getElementById('sel-all-btn');
+  if (btn) btn.textContent = (sel === _analyzeItems.length && _analyzeItems.length > 0) ? '全不選' : '全選';
 }
 
 async function submitAnalyze() {
