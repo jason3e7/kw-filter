@@ -54,6 +54,18 @@ RESTORED.mkdir(exist_ok=True)
 LLM_URL   = os.environ.get("KW_LLM_URL", "")
 LLM_MODEL = os.environ.get("KW_LLM_MODEL", "llama3")
 
+# ── ai4privacy (optional) ─────────────────────────────────────────────────────
+# Must be set before importing ai4privacy so the model is loaded from local cache.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+_ai4privacy_protect = None
+try:
+    from ai4privacy import protect as _ai4privacy_protect  # type: ignore
+    print("[kw-filter] ai4privacy loaded successfully", flush=True)
+except ImportError:
+    print("[kw-filter] ai4privacy not installed — PII detection disabled", flush=True)
+except Exception as _e:
+    print(f"[kw-filter] ai4privacy failed to load: {_e}", flush=True)
+
 # ── Content analysis — regex patterns ────────────────────────────────────────
 _IP_RE = re.compile(
     r'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}'
@@ -95,13 +107,11 @@ def _analyze_with_llm(content: str) -> list[str]:
 
 
 def _analyze_with_ai4privacy(content: str) -> list[dict]:
-    """Extract PII using ai4privacy. Returns [{value, labels: {label: count}}].
-    Silently skipped if ai4privacy is not installed."""
+    """Extract PII using ai4privacy. Returns [{value, labels: {label: count}}]."""
+    if _ai4privacy_protect is None:
+        return []
     try:
-        import os as _os
-        _os.environ.setdefault("HF_HUB_OFFLINE", "1")
-        from ai4privacy import protect  # type: ignore
-        result = protect(content, classify_pii=True, verbose=False)
+        result = _ai4privacy_protect(content, classify_pii=True, verbose=True)
         agg: dict[str, dict[str, int]] = {}
         for r in result.get("replacements", []):
             v = r.get("value", "").strip()
@@ -111,7 +121,8 @@ def _analyze_with_ai4privacy(content: str) -> list[dict]:
             agg.setdefault(v, {})
             agg[v][label] = agg[v].get(label, 0) + 1
         return [{"value": v, "labels": lc} for v, lc in agg.items()]
-    except Exception:
+    except Exception as e:
+        print(f"[kw-filter] ai4privacy error: {e}", flush=True)
         return []
 
 
