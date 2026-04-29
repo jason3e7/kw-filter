@@ -13,8 +13,10 @@ Run:
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -45,6 +47,98 @@ KEYWORDS_FILE = Path(os.environ.get("KW_KEYWORDS_FILE", MCP_DIR / "keywords.txt"
 
 STORAGE.mkdir(exist_ok=True)
 RESTORED.mkdir(exist_ok=True)
+
+# ── LLM integration (optional) ────────────────────────────────────────────────
+# Set KW_LLM_URL to enable local LLM keyword extraction.
+# Example (Ollama): KW_LLM_URL=http://localhost:11434  KW_LLM_MODEL=llama3
+LLM_URL   = os.environ.get("KW_LLM_URL", "")
+LLM_MODEL = os.environ.get("KW_LLM_MODEL", "llama3")
+
+# ── Content analysis — regex patterns ────────────────────────────────────────
+_IP_RE = re.compile(
+    r'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}'
+    r'(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b'
+)
+_DOMAIN_RE = re.compile(
+    r'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)'
+    r'+[a-zA-Z]{2,}\b'
+)
+_HASH_RE = re.compile(r'\b[0-9a-fA-F]{32,128}\b')
+_HASH_SUBTYPES: dict[int, str] = {32: "MD5", 40: "SHA1", 64: "SHA256", 128: "SHA512"}
+
+
+def _ip_subtype(ip_str: str) -> str:
+    try:
+        addr = ipaddress.ip_address(ip_str)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return "PRIVATE"
+    except ValueError:
+        pass
+    return "PUBLIC"
+
+
+def _analyze_with_llm(content: str) -> list[str]:
+    """Extract keywords via local LLM. Configure KW_LLM_URL + KW_LLM_MODEL to enable.
+
+    Ollama example:
+        # resp = httpx.post(f"{LLM_URL}/api/generate", json={
+        #     "model": LLM_MODEL,
+        #     "prompt": f"List all sensitive keywords, IPs, and IOCs. One per line:\\n\\n{content[:4000]}",
+        #     "stream": False,
+        # }, timeout=120)
+        # return [l.strip() for l in resp.json().get("response","").splitlines() if l.strip()]
+    """
+    if not LLM_URL:
+        return []
+    # TODO: implement LLM call
+    return []
+
+
+def _analyze_content(content: str) -> list[dict]:
+    seen: set[str] = set()
+    items: list[dict] = []
+
+    # 1. IPs
+    for m in _IP_RE.finditer(content):
+        v = m.group()
+        if v in seen:
+            continue
+        seen.add(v)
+        sub = _ip_subtype(v)
+        items.append({"value": v, "type": "IP", "subtype": sub,
+                      "auto_select": sub == "PUBLIC"})
+
+    ip_set = {i["value"] for i in items}
+
+    # 2. Domains (skip anything that parsed as an IP)
+    for m in _DOMAIN_RE.finditer(content):
+        v = m.group().lower()
+        if v in seen or v in ip_set:
+            continue
+        seen.add(v)
+        items.append({"value": v, "type": "DOMAIN", "subtype": None,
+                      "auto_select": True})
+
+    # 3. Hashes — greedy match gives longest hex run, classify by exact length
+    for m in _HASH_RE.finditer(content):
+        v = m.group().lower()
+        sub = _HASH_SUBTYPES.get(len(v))
+        if not sub or v in seen:
+            continue
+        seen.add(v)
+        items.append({"value": v, "type": "HASH", "subtype": sub,
+                      "auto_select": True})
+
+    # 4. LLM-extracted keywords (placeholder)
+    for v in _analyze_with_llm(content):
+        v = v.strip()
+        if v and v not in seen:
+            seen.add(v)
+            items.append({"value": v, "type": "LLM", "subtype": None,
+                          "auto_select": True})
+
+    return items
+
 
 # ── IP blacklist ──────────────────────────────────────────────────────────────
 # mcp/ip_blacklist.txt — one IP per line; lines starting with # are comments
@@ -299,6 +393,47 @@ def put_keywords(body: TextBody):
     KEYWORDS_FILE.write_text(body.content, encoding="utf-8")
     lines = [l for l in body.content.splitlines() if l.strip() and not l.startswith("#")]
     return {"keywords_count": len(lines)}
+
+
+# ── Content analysis ──────────────────────────────────────────────────────────
+
+class AnalyzeBody(BaseModel):
+    name: str = "input"
+    content: str
+
+
+@app.post("/analyze", summary="Detect IPs, domains, and hashes in text")
+def analyze(body: AnalyzeBody):
+    items = _analyze_content(body.content)
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item["type"]] = counts.get(item["type"], 0) + 1
+    return {"items": items, "counts": counts, "total": len(items)}
+
+
+class AppendKeywordsBody(BaseModel):
+    keywords: list[str]
+
+
+@app.post("/keywords/append", summary="Append keywords to keywords.txt (skip duplicates)")
+def append_keywords(body: AppendKeywordsBody):
+    KEYWORDS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    existing_text = KEYWORDS_FILE.read_text(encoding="utf-8") if KEYWORDS_FILE.exists() else ""
+    existing_set = {
+        l.strip() for l in existing_text.splitlines()
+        if l.strip() and not l.startswith("#")
+    }
+    new_kws = [k.strip() for k in body.keywords if k.strip() and k.strip() not in existing_set]
+    if new_kws:
+        with open(KEYWORDS_FILE, "a", encoding="utf-8") as f:
+            if existing_text and not existing_text.endswith("\n"):
+                f.write("\n")
+            f.write("\n".join(new_kws) + "\n")
+    return {
+        "appended": len(new_kws),
+        "skipped": len(body.keywords) - len(new_kws),
+        "total": len(existing_set) + len(new_kws),
+    }
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

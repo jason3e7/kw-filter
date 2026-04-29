@@ -143,6 +143,86 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
   color: var(--code-fg); white-space: pre-wrap; max-height: 180px; overflow-y: auto;
   display: none;
 }
+
+/* ── Analyze modal ── */
+.modal {
+  position: fixed; inset: 0; background: var(--bg);
+  z-index: 500; display: flex; flex-direction: column;
+}
+.modal.hidden { display: none; }
+
+.modal-header {
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 0.7rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-shrink: 0;
+}
+.back-btn {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 0.28rem 0.8rem; border-radius: 6px; font-size: 0.82rem; cursor: pointer;
+}
+.back-btn:hover { color: var(--white); border-color: #64748b; }
+
+.type-tabs { display: flex; gap: 0.55rem; flex-wrap: wrap; }
+.type-tab {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.28rem 0.75rem; border-radius: 6px; border: 1px solid var(--border);
+  font-size: 0.8rem; cursor: pointer; user-select: none; transition: border-color 0.15s;
+}
+.type-tab input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; }
+.type-tab.tab-IP     { border-color: #166534; color: #4ade80; }
+.type-tab.tab-DOMAIN { border-color: #4c1d95; color: #c084fc; }
+.type-tab.tab-HASH   { border-color: #1e3a5f; color: #60a5fa; }
+.type-tab.tab-LLM    { border-color: #3730a3; color: #a78bfa; }
+
+.modal-body { flex: 1; overflow-y: auto; padding: 0 1.5rem; }
+.modal-body::-webkit-scrollbar { width: 4px; }
+.modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.modal-footer {
+  background: var(--bg2); border-top: 1px solid var(--border);
+  padding: 0.7rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;
+}
+.sel-count { flex: 1; color: var(--muted); font-size: 0.85rem; }
+
+/* ── Analyze item rows ── */
+.analyze-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.52rem 0.4rem; border-bottom: 1px solid rgba(51,65,85,0.45);
+  transition: background 0.1s;
+}
+.analyze-item:hover { background: rgba(30,41,59,0.5); border-radius: 4px; }
+.analyze-item.deselected { opacity: 0.35; }
+.analyze-item input[type=checkbox] {
+  width: 15px; height: 15px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer;
+}
+.edit-btn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 0.78rem; padding: 0.1rem 0.3rem; border-radius: 3px;
+  flex-shrink: 0; opacity: 0; transition: opacity 0.1s;
+}
+.analyze-item:hover .edit-btn { opacity: 1; }
+.edit-btn:hover { color: var(--white); background: var(--border); }
+
+.type-badge {
+  font-size: 0.67rem; font-weight: 700; padding: 0.14rem 0.5rem;
+  border-radius: 4px; min-width: 60px; text-align: center;
+  flex-shrink: 0; letter-spacing: 0.3px; text-transform: uppercase;
+}
+.badge-ip      { background: #14532d; color: #4ade80; }
+.badge-private { background: #78350f; color: #fbbf24; }
+.badge-domain  { background: #3b0764; color: #c084fc; }
+.badge-hash    { background: #1e3a5f; color: #60a5fa; }
+.badge-llm     { background: #1e1b4b; color: #a78bfa; }
+
+.item-value {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.85rem; flex: 1; word-break: break-all;
+}
+.item-right-tag { color: var(--muted); font-size: 0.72rem; flex-shrink: 0; margin-left: auto; }
+.item-edit-input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--accent);
+  border-radius: 4px; color: var(--white); font-family: monospace;
+  font-size: 0.85rem; padding: 0.22rem 0.55rem;
+}
 </style>
 </head>
 <body>
@@ -201,6 +281,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
       <pre class="restore-result" id="restore-result"></pre>
     </div>
 
+    <div class="card">
+      <div class="card-title">🔍 分析並加入關鍵字</div>
+      <label class="field">貼上文字，自動辨識 IP、Domain、Hash</label>
+      <textarea id="analyze-content" style="min-height:120px;" placeholder="貼上日誌、報告或任何文字…"></textarea>
+      <div class="row-btns">
+        <button class="btn btn-blue" onclick="doAnalyze()">分析</button>
+        <span id="analyze-stat" style="color:var(--muted);font-size:0.78rem;"></span>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── 中欄：Tokenised 檔案 ── -->
@@ -228,6 +318,19 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 </div>
 
 <div id="toasts"></div>
+
+<div id="analyze-modal" class="modal hidden">
+  <div class="modal-header">
+    <button class="back-btn" onclick="closeAnalyzeModal()">← 返回</button>
+    <div class="type-tabs" id="type-tabs"></div>
+  </div>
+  <div class="modal-body" id="analyze-items"></div>
+  <div class="modal-footer">
+    <span class="sel-count" id="sel-count"></span>
+    <button class="btn btn-muted" onclick="closeAnalyzeModal()">取消</button>
+    <button class="btn btn-danger" onclick="submitAnalyze()">加入關鍵字</button>
+  </div>
+</div>
 
 <script>
 // ── Toast ────────────────────────────────────────────────────────────────────
@@ -438,6 +541,168 @@ function download(name, content) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ── Analyze modal ─────────────────────────────────────────────────────────────
+let _analyzeItems = [];   // [{value, type, subtype, auto_select, selected, edited}]
+let _activeFilter = null; // null = show all
+
+async function doAnalyze() {
+  const content = document.getElementById('analyze-content').value;
+  if (!content.trim()) { toast('請輸入內容', false); return; }
+  const stat = document.getElementById('analyze-stat');
+  stat.innerHTML = '<span class="spinner"></span>';
+  try {
+    const r = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    const d = await r.json();
+    if (!d.total) { stat.textContent = '未偵測到任何目標'; return; }
+    stat.textContent = `偵測到 ${d.total} 個目標`;
+    _analyzeItems = d.items.map(i => ({ ...i, selected: i.auto_select, edited: null }));
+    _activeFilter = null;
+    _openModal();
+  } catch { stat.textContent = '分析失敗'; toast('分析失敗', false); }
+}
+
+function _openModal() {
+  document.getElementById('analyze-modal').classList.remove('hidden');
+  _renderTabs();
+  _renderItems();
+  _updateCount();
+}
+
+function closeAnalyzeModal() {
+  document.getElementById('analyze-modal').classList.add('hidden');
+}
+
+function _renderTabs() {
+  const types = [...new Set(_analyzeItems.map(i => i.type))];
+  const total = _analyzeItems.length;
+  const container = document.getElementById('type-tabs');
+  container.innerHTML = '';
+
+  // "全部" tab
+  const all = document.createElement('label');
+  all.className = 'type-tab' + (_activeFilter === null ? ' tab-IP' : '');
+  all.style.borderColor = _activeFilter === null ? '#4ade80' : '';
+  all.style.color       = _activeFilter === null ? '#4ade80' : '';
+  all.innerHTML = `<input type="checkbox" ${_activeFilter === null ? 'checked' : ''} onchange="_toggleFilter(null, this)"> 全部 (${total})`;
+  container.appendChild(all);
+
+  types.forEach(type => {
+    const count = _analyzeItems.filter(i => i.type === type).length;
+    const active = _activeFilter === type;
+    const tab = document.createElement('label');
+    tab.className = `type-tab tab-${type}`;
+    if (active) tab.style.fontWeight = '700';
+    tab.innerHTML = `<input type="checkbox" ${active || _activeFilter === null ? 'checked' : ''} onchange="_toggleFilter('${type}', this)"> ${type} (${count})`;
+    container.appendChild(tab);
+  });
+}
+
+function _toggleFilter(type, cb) {
+  _activeFilter = (_activeFilter === type) ? null : type;
+  _renderTabs();
+  _renderItems();
+}
+
+function _renderItems() {
+  const container = document.getElementById('analyze-items');
+  container.innerHTML = '';
+  const visible = _activeFilter ? _analyzeItems.filter(i => i.type === _activeFilter) : _analyzeItems;
+  if (!visible.length) {
+    container.innerHTML = '<div class="empty">此類型無結果</div>';
+    return;
+  }
+  visible.forEach((item, _) => {
+    const idx = _analyzeItems.indexOf(item);
+    const value = item.edited !== null ? item.edited : item.value;
+    const row = document.createElement('div');
+    row.className = 'analyze-item' + (item.selected ? '' : ' deselected');
+    row.id = `ai-row-${idx}`;
+    row.innerHTML = `
+      <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="_toggle(${idx}, this)">
+      <span class="${_badgeCls(item)}">${_badgeLabel(item)}</span>
+      <span class="item-value" id="ai-val-${idx}">${esc(value)}</span>
+      <button class="edit-btn" onclick="_startEdit(${idx})" title="編輯">✏️</button>
+      ${item.subtype && item.type === 'HASH' ? `<span class="item-right-tag">${item.subtype}</span>` : ''}
+    `;
+    container.appendChild(row);
+  });
+}
+
+function _badgeCls(item) {
+  if (item.type === 'IP') return item.subtype === 'PRIVATE' ? 'type-badge badge-private' : 'type-badge badge-ip';
+  if (item.type === 'DOMAIN') return 'type-badge badge-domain';
+  if (item.type === 'HASH')   return 'type-badge badge-hash';
+  return 'type-badge badge-llm';
+}
+
+function _badgeLabel(item) {
+  if (item.type === 'IP') return item.subtype === 'PRIVATE' ? 'IP·私有' : 'IP·公開';
+  if (item.type === 'DOMAIN') return 'DOMAIN';
+  if (item.type === 'HASH')   return item.subtype || 'HASH';
+  return 'LLM';
+}
+
+function _toggle(idx, cb) {
+  _analyzeItems[idx].selected = cb.checked;
+  const row = document.getElementById(`ai-row-${idx}`);
+  if (row) row.className = 'analyze-item' + (cb.checked ? '' : ' deselected');
+  _updateCount();
+}
+
+function _startEdit(idx) {
+  const valEl = document.getElementById(`ai-val-${idx}`);
+  if (!valEl) return;
+  const current = _analyzeItems[idx].edited !== null ? _analyzeItems[idx].edited : _analyzeItems[idx].value;
+  valEl.outerHTML = `<input class="item-edit-input" id="ai-val-${idx}" value="${esc(current)}"
+    onblur="_saveEdit(${idx})" onkeydown="if(event.key==='Enter')_saveEdit(${idx}); if(event.key==='Escape')_cancelEdit(${idx})">`;
+  const inp = document.getElementById(`ai-val-${idx}`);
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function _saveEdit(idx) {
+  const inp = document.getElementById(`ai-val-${idx}`);
+  if (!inp) return;
+  const val = inp.value.trim();
+  _analyzeItems[idx].edited = val || null;
+  inp.outerHTML = `<span class="item-value" id="ai-val-${idx}">${esc(val || _analyzeItems[idx].value)}</span>`;
+}
+
+function _cancelEdit(idx) {
+  const inp = document.getElementById(`ai-val-${idx}`);
+  if (!inp) return;
+  const orig = _analyzeItems[idx].edited !== null ? _analyzeItems[idx].edited : _analyzeItems[idx].value;
+  inp.outerHTML = `<span class="item-value" id="ai-val-${idx}">${esc(orig)}</span>`;
+}
+
+function _updateCount() {
+  const sel = _analyzeItems.filter(i => i.selected).length;
+  document.getElementById('sel-count').textContent = `已選取 ${sel} / ${_analyzeItems.length} 個目標`;
+}
+
+async function submitAnalyze() {
+  const keywords = _analyzeItems
+    .filter(i => i.selected)
+    .map(i => i.edited !== null ? i.edited : i.value)
+    .filter(v => v.trim());
+  if (!keywords.length) { toast('請至少選取一個目標', false); return; }
+  const r = await fetch('/keywords/append', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keywords })
+  });
+  if (!r.ok) { toast('加入失敗 ' + r.status, false); return; }
+  const d = await r.json();
+  toast(`已加入 ${d.appended} 個關鍵字（跳過 ${d.skipped} 個重複）`);
+  closeAnalyzeModal();
+  document.getElementById('analyze-content').value = '';
+  document.getElementById('analyze-stat').textContent = '';
+  loadKw();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
