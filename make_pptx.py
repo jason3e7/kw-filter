@@ -889,23 +889,29 @@ def s14b_mcp(prs):
           row_h=Inches(0.35),
           cell_size=Pt(10.5))
 
-    # IP blacklist: table height = 10 rows * 0.35 = 3.50"
+    # New endpoints (analyze + keywords/append) + config.json note
+    tbl_rows2 = [
+        ["POST /analyze",          "Regex + ai4privacy PII 偵測，回傳 items + warnings"],
+        ["POST /keywords/append",  "批次附加關鍵字（自動略過重複）"],
+    ]
     bl_y = BODY_TOP + Inches(3.62)
-    blacklist_code = (
-        "# mcp/ip_blacklist.txt\n"
-        "# 每行一個 IP，# 開頭為註解\n"
-        "# 空白檔案 = 不限制任何 IP\n"
-        "203.0.113.10\n"
-        "198.51.100.42"
-    )
-    code_block(slide, R, bl_y, HW, Inches(1.38), blacklist_code, "IP 黑名單設定")
+    table(slide, R, bl_y, HW,
+          col_fracs=[1.8, 2.2],
+          headers=["新增 Endpoint", "說明"],
+          rows=tbl_rows2,
+          row_h=Inches(0.38),
+          cell_size=Pt(10.5))
 
-    # Restricted endpoints note
-    note_y = bl_y + Inches(1.49)
-    card(slide, R, note_y, HW, Inches(0.62),
-         body="黑名單 IP 無法存取：/docs · /keywords · /restored\n檔案即時生效，無需重啟 server",
-         body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d),
-         border=DANGER)
+    # config.json blacklist note
+    note_y = bl_y + Inches(0.38 * 3) + Inches(0.15)
+    cfg_note = (
+        "# mcp/server/config.json\n"
+        '"ip_blacklist": ["203.0.113.10"]'
+    )
+    code_block(slide, R, note_y, HW, Inches(0.88), cfg_note, "IP 黑名單（config.json）")
+    card(slide, R, note_y + Inches(0.99), HW, Inches(0.52),
+         body="每次請求重新讀取 config.json，無需重啟即生效",
+         body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d), border=DANGER)
 
     txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
            "github.com/jason3e7/kw-filter",
@@ -1006,6 +1012,214 @@ def s14c_webui(prs):
         rd = p.add_run(); rd.text = desc
         rd.font.size = Pt(12); rd.font.color.rgb = WHITE; rd.font.name = "Noto Sans TC"
         wy += Inches(0.62)
+
+    txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
+           "github.com/jason3e7/kw-filter",
+           size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
+
+
+def s14d_analyze(prs):
+    slide = blank(prs)
+    heading(slide, "內容分析：上傳前自動偵測關鍵字")
+
+    # ── Left column: flow ─────────────────────────────────────────────────────
+    steps = [
+        ("① 選擇檔案",   "拖曳 / 選取 / 貼上文字"),
+        ("② 自動分析",   "呼叫 POST /analyze，偵測 Regex + PII"),
+        ("③ 確認關鍵字", "勾選要加入的項目（預設全不選）"),
+        ("④ 附加關鍵字", "POST /keywords/append 批次新增"),
+        ("⑤ 上傳替換",   "POST /files replace，完成 tokenise"),
+    ]
+    CARD_BG = RGBColor(0x0e, 0x1c, 0x12)
+    sy = BODY_TOP
+    for step, desc in steps:
+        shape = rect(slide, ML, sy, HW, Inches(0.60),
+                     fill_color=CARD_BG, border_color=BORDER)
+        tf = shape.text_frame; tf.word_wrap = True
+        _set_txbody_margins(tf._txBody, l=Pt(10), r=Pt(8), t=Pt(8), b=Pt(8))
+        p = tf.paragraphs[0]
+        rs = p.add_run(); rs.text = step + "  "
+        rs.font.size = Pt(12.5); rs.font.bold = True
+        rs.font.color.rgb = ACCENT; rs.font.name = "Noto Sans TC"
+        rd = p.add_run(); rd.text = desc
+        rd.font.size = Pt(12.5); rd.font.color.rgb = WHITE; rd.font.name = "Noto Sans TC"
+        sy += Inches(0.66)
+
+    # 分析結果 table caption
+    txtbox(slide, ML, sy + Inches(0.05), HW, Inches(0.25),
+           "分析結果 Modal — 欄位說明",
+           size=Pt(10.5), color=MUTED)
+    col_rows = [
+        ["checkbox", "勾選後才會被加入 keywords"],
+        ["類型",     "IP / Email / Phone / PII / …"],
+        ["值",       "偵測到的原始字串"],
+        ["標籤",     "ai4privacy 標籤 × 出現次數"],
+    ]
+    table(slide, ML, sy + Inches(0.30), HW,
+          col_fracs=[1.4, 2.6],
+          headers=["欄位", "說明"],
+          rows=col_rows,
+          row_h=Inches(0.36),
+          cell_size=Pt(10.5))
+
+    # ── Right column ─────────────────────────────────────────────────────────
+    # Regex detection types
+    txtbox(slide, R, BODY_TOP, HW, Inches(0.25),
+           "Regex 偵測類型", size=Pt(10.5), color=MUTED)
+    regex_rows = [
+        ["IP",      "IPv4 / IPv6 位址"],
+        ["Email",   "電子郵件"],
+        ["Phone",   "電話號碼（含國碼）"],
+        ["URL",     "http / https 連結"],
+        ["Path",    "Unix / Windows 路徑"],
+        ["JWT",     "JSON Web Token"],
+        ["UUID",    "UUID v1–v5"],
+        ["AWS Key", "AKIA… 存取金鑰"],
+        ["Base64",  "長度 ≥ 16 的 base64 字串"],
+    ]
+    table(slide, R, BODY_TOP + Inches(0.28), HW,
+          col_fracs=[1.5, 2.5],
+          headers=["類型", "說明"],
+          rows=regex_rows,
+          row_h=Inches(0.33),
+          cell_size=Pt(10.5))
+
+    # Default unchecked note
+    note_y = BODY_TOP + Inches(0.28 + 0.33 * 10) + Inches(0.12)
+    card(slide, R, note_y, HW, Inches(0.52),
+         body="預設全部不勾選 — 使用者主動確認後才會加入 keywords",
+         body_size=Pt(12), fill=RGBColor(0x1a, 0x1a, 0x0d), border=WARN)
+
+    txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
+           "github.com/jason3e7/kw-filter",
+           size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
+
+
+def s14e_ai4privacy(prs):
+    slide = blank(prs)
+    heading(slide, "ai4privacy：PII 偵測整合")
+
+    # ── Left column: how it works ─────────────────────────────────────────────
+    txtbox(slide, ML, BODY_TOP, HW, Inches(0.25),
+           "運作原理", size=Pt(10.5), color=MUTED)
+
+    arch = (
+        "文字內容\n"
+        "  └─ 截斷至 ai4privacy_max_chars\n"
+        "       └─ 切分 chunks（≤ ai4privacy_chunk_chars）\n"
+        "            └─ 每 chunk 送入 transformer 模型\n"
+        "                 └─ 彙整所有 entity → 回傳 items"
+    )
+    code_block(slide, ML, BODY_TOP + Inches(0.28), HW, Inches(1.55), arch, "處理流程")
+
+    # Chunking detail
+    chunk_rows = [
+        ["ai4privacy_chunk_chars", "每個 chunk 最大字元數（預設 1200）"],
+        ["ai4privacy_max_chars",   "全文處理上限（預設 60000）"],
+        ["截斷警告",               "超過上限時 UI 顯示琥珀色警告橫幅"],
+        ["切分策略",               "優先在換行 / 空格處切分，避免斷字"],
+    ]
+    txtbox(slide, ML, BODY_TOP + Inches(1.95), HW, Inches(0.25),
+           "Chunking 設定", size=Pt(10.5), color=MUTED)
+    table(slide, ML, BODY_TOP + Inches(2.22), HW,
+          col_fracs=[2.0, 2.2],
+          headers=["參數 / 行為", "說明"],
+          rows=chunk_rows,
+          row_h=Inches(0.38),
+          cell_size=Pt(10.5))
+
+    # Why chunking needed
+    card(slide, ML, BODY_TOP + Inches(2.22 + 0.38 * 5) + Inches(0.12), HW, Inches(0.62),
+         body="Transformer 最大序列長度 1536 tokens；\n大型檔案不分 chunk 會觸發 token 超限錯誤",
+         body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d), border=DANGER)
+
+    # ── Right column: label display + warnings ───────────────────────────────
+    txtbox(slide, R, BODY_TOP, HW, Inches(0.25),
+           "PII 標籤顯示", size=Pt(10.5), color=MUTED)
+
+    label_ex = (
+        "偵測結果合併同值 entity：\n\n"
+        "值: john@example.com\n"
+        "標籤: EMAIL_ADDRESS×2  USERNAME×1\n\n"
+        "值: 192.168.1.1\n"
+        "標籤: IP_ADDRESS×3"
+    )
+    code_block(slide, R, BODY_TOP + Inches(0.28), HW, Inches(1.70), label_ex, "標籤 × 次數")
+
+    # Warnings
+    txtbox(slide, R, BODY_TOP + Inches(2.10), HW, Inches(0.25),
+           "截斷警告（UI）", size=Pt(10.5), color=MUTED)
+    warn_code = (
+        "ai4privacy: 內容 89,432 字元\n"
+        "超過上限 60,000，\n"
+        "僅分析前 60,000 字元"
+    )
+    code_block(slide, R, BODY_TOP + Inches(2.38), HW, Inches(1.10), warn_code, "警告範例（琥珀色橫幅）",
+               label_color=WARN)
+
+    # Module-level import note
+    card(slide, R, BODY_TOP + Inches(2.38 + 1.22), HW, Inches(0.62),
+         body="模型在 server 啟動時載入（module-level import）\n避免第一次請求時才初始化的延遲",
+         body_size=Pt(12), fill=RGBColor(0x0d, 0x1a, 0x0d), border=ACCENT)
+
+    # Offline mode
+    card(slide, R, BODY_TOP + Inches(2.38 + 1.22 + 0.72), HW, Inches(0.52),
+         title="離線模式",
+         body="hf_hub_offline: true → 不嘗試從 HuggingFace 下載模型",
+         body_size=Pt(11.5))
+
+    txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
+           "github.com/jason3e7/kw-filter",
+           size=Pt(11.5), color=MUTED, align=PP_ALIGN.RIGHT)
+
+
+def s14f_config(prs):
+    slide = blank(prs)
+    heading(slide, "設定檔：mcp/server/config.json")
+
+    # ── Left column: full config.json ────────────────────────────────────────
+    cfg_json = (
+        '{\n'
+        '  "keywords_file":          "keywords.txt",\n'
+        '  "hf_hub_offline":         true,\n'
+        '  "ai4privacy_chunk_chars": 1200,\n'
+        '  "ai4privacy_max_chars":   60000,\n'
+        '  "ip_blacklist":           [],\n'
+        '  "llm_url":                "",\n'
+        '  "llm_model":              "llama3"\n'
+        '}'
+    )
+    code_block(slide, ML, BODY_TOP, HW, Inches(2.20), cfg_json, "完整設定檔")
+
+    # No HTTP API note
+    card(slide, ML, BODY_TOP + Inches(2.32), HW, Inches(0.52),
+         body="設定僅能直接編輯檔案 — 沒有 HTTP API 可修改",
+         body_size=Pt(12), fill=RGBColor(0x1a, 0x0d, 0x0d), border=DANGER)
+
+    # ── Right column: field descriptions ─────────────────────────────────────
+    field_rows = [
+        ["keywords_file",          "關鍵字清單路徑（相對 server.py）"],
+        ["hf_hub_offline",         "true → 不從 HuggingFace 下載模型"],
+        ["ai4privacy_chunk_chars", "ai4privacy 單 chunk 最大字元（建議 1200）"],
+        ["ai4privacy_max_chars",   "全文分析上限（0 = 不限，60000 建議值）"],
+        ["ip_blacklist",           "封鎖 IP 清單，每次請求重新讀取，無需重啟"],
+        ["llm_url",                "（預留）LLM API 端點"],
+        ["llm_model",              "（預留）LLM 模型名稱"],
+    ]
+    txtbox(slide, R, BODY_TOP, HW, Inches(0.25),
+           "欄位說明", size=Pt(10.5), color=MUTED)
+    table(slide, R, BODY_TOP + Inches(0.28), HW,
+          col_fracs=[2.0, 2.0],
+          headers=["欄位", "說明"],
+          rows=field_rows,
+          row_h=Inches(0.38),
+          cell_size=Pt(10.5))
+
+    # Hot-reload note
+    reload_y = BODY_TOP + Inches(0.28 + 0.38 * 8) + Inches(0.12)
+    card(slide, R, reload_y, HW, Inches(0.62),
+         body="ip_blacklist 每次請求重新讀取 config.json\n→ 新增 / 移除黑名單無需重啟 server",
+         body_size=Pt(12), fill=RGBColor(0x0d, 0x1a, 0x0d), border=ACCENT)
 
     txtbox(slide, ML, Inches(6.90), CW, Inches(0.3),
            "github.com/jason3e7/kw-filter",
@@ -1122,6 +1336,9 @@ def main():
     s14_quickstart(prs)
     s14b_mcp(prs)
     s14c_webui(prs)
+    s14d_analyze(prs)
+    s14e_ai4privacy(prs)
+    s14f_config(prs)
     s15_bigquestion(prs)
 
     out = "/home/null/kw-filter/kw-filter.pptx"
