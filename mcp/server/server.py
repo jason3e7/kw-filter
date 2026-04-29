@@ -57,6 +57,10 @@ _CONFIG_DEFAULTS: dict = {
     # ai4privacy_chunk_chars: chars per chunk sent to the PII model (max ~1536 tokens)
     # Dense content (logs, code) can be ~1 char/token; 1200 chars ≈ 1200 tokens worst case
     "ai4privacy_chunk_chars": 1200,
+    # ai4privacy_max_chars: total chars fed to ai4privacy; content beyond this is ignored
+    # Prevents server hang on large files (1264 chunks × inference time = hours)
+    # Increase if your hardware is fast enough; set to 0 to disable the limit
+    "ai4privacy_max_chars":   60000,
     # ip_blacklist: list of IPs blocked from /docs /keywords /restored
     "ip_blacklist":           [],
     # llm_url / llm_model: reserved for future local LLM keyword extraction (Ollama etc.)
@@ -155,8 +159,8 @@ def _analyze_with_llm(content: str) -> list[str]:
     return []
 
 
-# ai4privacy model max is 1536 tokens; ~4 chars/token → default 4000 chars per chunk
 _AI4PRIVACY_CHUNK_CHARS: int = int(_CFG["ai4privacy_chunk_chars"])
+_AI4PRIVACY_MAX_CHARS:   int = int(_CFG["ai4privacy_max_chars"])
 
 
 def _split_text_chunks(text: str, max_chars: int) -> list[str]:
@@ -168,11 +172,10 @@ def _split_text_chunks(text: str, max_chars: int) -> list[str]:
         if len(text) <= max_chars:
             chunks.append(text)
             break
-        # Prefer a newline close to the limit
         pos = text.rfind('\n', 0, max_chars)
-        if pos < max_chars // 2:          # newline too far back — fall back to space
+        if pos < max_chars // 2:
             pos = text.rfind(' ', 0, max_chars)
-        if pos <= 0:                       # no good boundary — hard cut
+        if pos <= 0:
             pos = max_chars
         chunks.append(text[:pos])
         text = text[pos:].lstrip('\n')
@@ -182,16 +185,25 @@ def _split_text_chunks(text: str, max_chars: int) -> list[str]:
 def _analyze_with_ai4privacy(content: str) -> list[dict]:
     """Extract PII using ai4privacy, chunking large inputs automatically.
 
-    Returns [{value: str, labels: {label: count}}].
-    Chunk size is controlled by KW_AI4PRIVACY_CHUNK_CHARS (default 4000).
+    Total input is capped at ai4privacy_max_chars (config.json) to prevent
+    server hang on large files. Set to 0 to disable the cap.
     """
     if _ai4privacy_protect is None:
         return []
 
+    total = len(content)
+    if _AI4PRIVACY_MAX_CHARS > 0 and total > _AI4PRIVACY_MAX_CHARS:
+        print(
+            f"[kw-filter] ai4privacy: input {total} chars exceeds limit "
+            f"{_AI4PRIVACY_MAX_CHARS} — truncating (set ai4privacy_max_chars in "
+            f"config.json to adjust)",
+            flush=True,
+        )
+        content = content[:_AI4PRIVACY_MAX_CHARS]
+
     chunks = _split_text_chunks(content, _AI4PRIVACY_CHUNK_CHARS)
     n = len(chunks)
-    if n > 1:
-        print(f"[kw-filter] ai4privacy: {len(content)} chars → {n} chunks", flush=True)
+    print(f"[kw-filter] ai4privacy: {len(content)} chars → {n} chunks", flush=True)
 
     agg: dict[str, dict[str, int]] = {}
     for i, chunk in enumerate(chunks):
@@ -204,6 +216,7 @@ def _analyze_with_ai4privacy(content: str) -> list[dict]:
                     continue
                 agg.setdefault(v, {})
                 agg[v][label] = agg[v].get(label, 0) + 1
+            print(f"[kw-filter] ai4privacy chunk {i + 1}/{n} done", flush=True)
         except Exception as e:
             print(f"[kw-filter] ai4privacy chunk {i + 1}/{n} error: {e}", flush=True)
 
