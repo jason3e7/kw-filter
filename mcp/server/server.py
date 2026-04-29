@@ -106,24 +106,59 @@ def _analyze_with_llm(content: str) -> list[str]:
     return []
 
 
+# ai4privacy model max is 1536 tokens; ~4 chars/token → 4000 chars is a safe chunk size
+_AI4PRIVACY_CHUNK_CHARS = int(os.environ.get("KW_AI4PRIVACY_CHUNK_CHARS", 4000))
+
+
+def _split_text_chunks(text: str, max_chars: int) -> list[str]:
+    """Split text into chunks ≤ max_chars, breaking at newline or word boundaries."""
+    if len(text) <= max_chars:
+        return [text]
+    chunks: list[str] = []
+    while text:
+        if len(text) <= max_chars:
+            chunks.append(text)
+            break
+        # Prefer a newline close to the limit
+        pos = text.rfind('\n', 0, max_chars)
+        if pos < max_chars // 2:          # newline too far back — fall back to space
+            pos = text.rfind(' ', 0, max_chars)
+        if pos <= 0:                       # no good boundary — hard cut
+            pos = max_chars
+        chunks.append(text[:pos])
+        text = text[pos:].lstrip('\n')
+    return [c for c in chunks if c.strip()]
+
+
 def _analyze_with_ai4privacy(content: str) -> list[dict]:
-    """Extract PII using ai4privacy. Returns [{value, labels: {label: count}}]."""
+    """Extract PII using ai4privacy, chunking large inputs automatically.
+
+    Returns [{value: str, labels: {label: count}}].
+    Chunk size is controlled by KW_AI4PRIVACY_CHUNK_CHARS (default 4000).
+    """
     if _ai4privacy_protect is None:
         return []
-    try:
-        result = _ai4privacy_protect(content, classify_pii=True, verbose=True)
-        agg: dict[str, dict[str, int]] = {}
-        for r in result.get("replacements", []):
-            v = r.get("value", "").strip()
-            label = r.get("label", "PII")
-            if not v:
-                continue
-            agg.setdefault(v, {})
-            agg[v][label] = agg[v].get(label, 0) + 1
-        return [{"value": v, "labels": lc} for v, lc in agg.items()]
-    except Exception as e:
-        print(f"[kw-filter] ai4privacy error: {e}", flush=True)
-        return []
+
+    chunks = _split_text_chunks(content, _AI4PRIVACY_CHUNK_CHARS)
+    n = len(chunks)
+    if n > 1:
+        print(f"[kw-filter] ai4privacy: {len(content)} chars → {n} chunks", flush=True)
+
+    agg: dict[str, dict[str, int]] = {}
+    for i, chunk in enumerate(chunks):
+        try:
+            result = _ai4privacy_protect(chunk, classify_pii=True, verbose=True)
+            for r in result.get("replacements", []):
+                v = r.get("value", "").strip()
+                label = r.get("label", "PII")
+                if not v:
+                    continue
+                agg.setdefault(v, {})
+                agg[v][label] = agg[v].get(label, 0) + 1
+        except Exception as e:
+            print(f"[kw-filter] ai4privacy chunk {i + 1}/{n} error: {e}", flush=True)
+
+    return [{"value": v, "labels": lc} for v, lc in agg.items()]
 
 
 def _analyze_content(content: str) -> list[dict]:
