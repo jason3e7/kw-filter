@@ -94,8 +94,30 @@ def _analyze_with_llm(content: str) -> list[str]:
     return []
 
 
+def _analyze_with_ai4privacy(content: str) -> list[dict]:
+    """Extract PII using ai4privacy. Returns [{value, labels: {label: count}}].
+    Silently skipped if ai4privacy is not installed."""
+    try:
+        import os as _os
+        _os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        from ai4privacy import protect  # type: ignore
+        result = protect(content, classify_pii=True, verbose=False)
+        agg: dict[str, dict[str, int]] = {}
+        for r in result.get("replacements", []):
+            v = r.get("value", "").strip()
+            label = r.get("label", "PII")
+            if not v:
+                continue
+            agg.setdefault(v, {})
+            agg[v][label] = agg[v].get(label, 0) + 1
+        return [{"value": v, "labels": lc} for v, lc in agg.items()]
+    except Exception:
+        return []
+
+
 def _analyze_content(content: str) -> list[dict]:
     seen: set[str] = set()
+    seen_lower: set[str] = set()
     items: list[dict] = []
 
     # 1. IPs
@@ -103,7 +125,7 @@ def _analyze_content(content: str) -> list[dict]:
         v = m.group()
         if v in seen:
             continue
-        seen.add(v)
+        seen.add(v); seen_lower.add(v.lower())
         sub = _ip_subtype(v)
         items.append({"value": v, "type": "IP", "subtype": sub,
                       "auto_select": False})
@@ -115,7 +137,7 @@ def _analyze_content(content: str) -> list[dict]:
         v = m.group().lower()
         if v in seen or v in ip_set:
             continue
-        seen.add(v)
+        seen.add(v); seen_lower.add(v)
         items.append({"value": v, "type": "DOMAIN", "subtype": None,
                       "auto_select": False})
 
@@ -125,7 +147,7 @@ def _analyze_content(content: str) -> list[dict]:
         sub = _HASH_SUBTYPES.get(len(v))
         if not sub or v in seen:
             continue
-        seen.add(v)
+        seen.add(v); seen_lower.add(v)
         items.append({"value": v, "type": "HASH", "subtype": sub,
                       "auto_select": False})
 
@@ -133,9 +155,20 @@ def _analyze_content(content: str) -> list[dict]:
     for v in _analyze_with_llm(content):
         v = v.strip()
         if v and v not in seen:
-            seen.add(v)
+            seen.add(v); seen_lower.add(v.lower())
             items.append({"value": v, "type": "LLM", "subtype": None,
                           "auto_select": False})
+
+    # 5. ai4privacy PII detection
+    for pii in _analyze_with_ai4privacy(content):
+        v = pii["value"]
+        if v.lower() in seen_lower:
+            continue
+        seen.add(v); seen_lower.add(v.lower())
+        labels: dict[str, int] = pii["labels"]
+        primary = max(labels, key=labels.__getitem__) if labels else "PII"
+        items.append({"value": v, "type": "PII", "subtype": primary,
+                      "labels": labels, "auto_select": False})
 
     return items
 
