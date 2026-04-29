@@ -185,42 +185,35 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 .sel-count { flex: 1; color: var(--muted); font-size: 0.85rem; }
 
 /* ── Analyze table ── */
-/* columns: [checkbox] [type] [value] [labels] [edit] */
-.analyze-table-header,
-.analyze-item {
-  display: grid;
-  grid-template-columns: 28px 84px 1fr 220px 28px;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.75rem;
-}
-.analyze-table-header {
+.analyze-table { border-collapse: collapse; white-space: nowrap; }
+.analyze-table thead tr {
   position: sticky; top: 0; background: var(--bg3);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); z-index: 1;
+}
+.analyze-table th {
+  padding: 0.4rem 0.7rem; text-align: left;
   color: var(--muted); font-size: 0.72rem; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.4px; z-index: 1;
+  text-transform: uppercase; letter-spacing: 0.4px;
 }
-.analyze-item {
-  border-bottom: 1px solid rgba(51,65,85,0.35);
-  transition: background 0.1s;
-}
-.analyze-item:hover { background: rgba(30,41,59,0.5); }
-.analyze-item.deselected { opacity: 0.35; }
-.analyze-item input[type=checkbox] {
-  width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; justify-self: center;
+.analyze-table td { padding: 0.42rem 0.7rem; vertical-align: middle; }
+.analyze-table tbody tr { border-bottom: 1px solid rgba(51,65,85,0.35); }
+.analyze-table tbody tr:hover { background: rgba(30,41,59,0.5); }
+.analyze-table tbody tr.deselected { opacity: 0.35; }
+.analyze-table input[type=checkbox] {
+  width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; display: block;
 }
 .edit-btn {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 0.78rem; padding: 0.1rem 0.3rem; border-radius: 3px;
-  opacity: 0; transition: opacity 0.1s; justify-self: center;
+  opacity: 0; transition: opacity 0.1s; display: block;
 }
-.analyze-item:hover .edit-btn { opacity: 1; }
+.analyze-table tbody tr:hover .edit-btn { opacity: 1; }
 .edit-btn:hover { color: var(--white); background: var(--border); }
 
 .type-badge {
   font-size: 0.67rem; font-weight: 700; padding: 0.14rem 0.5rem;
-  border-radius: 4px; text-align: center;
-  letter-spacing: 0.3px; text-transform: uppercase; width: 100%;
+  border-radius: 4px; text-align: center; display: inline-block;
+  letter-spacing: 0.3px; text-transform: uppercase; min-width: 72px;
 }
 .badge-ip      { background: #14532d; color: #4ade80; }
 .badge-private { background: #78350f; color: #fbbf24; }
@@ -231,7 +224,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 
 .item-value {
   font-family: 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.85rem; max-width: 420px;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .item-labels { display: flex; gap: 0.25rem; flex-wrap: wrap; }
 .item-label-tag {
@@ -241,7 +235,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 .item-edit-input {
   background: var(--bg3); border: 1px solid var(--accent);
   border-radius: 4px; color: var(--white); font-family: monospace;
-  font-size: 0.85rem; padding: 0.22rem 0.55rem; width: 100%;
+  font-size: 0.85rem; padding: 0.22rem 0.55rem;
 }
 </style>
 </head>
@@ -666,14 +660,15 @@ function _renderItems() {
   container.innerHTML = '';
   if (!_analyzeItems.length) { container.innerHTML = '<div class="empty">無偵測結果</div>'; return; }
 
-  const hdr = document.createElement('div');
-  hdr.className = 'analyze-table-header';
-  hdr.innerHTML = '<span></span><span>類型</span><span>值</span><span>標籤</span><span></span>';
-  container.appendChild(hdr);
+  const table = document.createElement('table');
+  table.className = 'analyze-table';
+  table.innerHTML = `<thead><tr>
+    <th></th><th>類型</th><th>值</th><th>標籤</th><th></th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
 
   _analyzeItems.forEach((item, idx) => {
     const value = item.edited !== null ? item.edited : item.value;
-    // Labels column: PII → label×count tags; HASH → subtype tag; others → empty
     let labelsHtml = '';
     if (item.labels) {
       labelsHtml = Object.entries(item.labels)
@@ -681,17 +676,20 @@ function _renderItems() {
     } else if (item.type === 'HASH' && item.subtype) {
       labelsHtml = `<span class="item-label-tag">${esc(item.subtype)}</span>`;
     }
-    const row = document.createElement('div');
-    row.className = 'analyze-item' + (item.selected ? '' : ' deselected');
-    row.id = `ai-row-${idx}`;
-    row.innerHTML = `
-      <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="_toggle(${idx}, this)">
-      <span class="${_badgeCls(item)}">${_badgeLabel(item)}</span>
-      <span class="item-value" id="ai-val-${idx}" title="${esc(value)}">${esc(value)}</span>
-      <span class="item-labels">${labelsHtml}</span>
-      <button class="edit-btn" onclick="_startEdit(${idx})" title="編輯">✏️</button>`;
-    container.appendChild(row);
+    const tr = document.createElement('tr');
+    tr.id = `ai-row-${idx}`;
+    tr.className = item.selected ? '' : 'deselected';
+    tr.innerHTML = `
+      <td><input type="checkbox" ${item.selected ? 'checked' : ''} onchange="_toggle(${idx}, this)"></td>
+      <td><span class="${_badgeCls(item)}">${_badgeLabel(item)}</span></td>
+      <td><span class="item-value" id="ai-val-${idx}" title="${esc(value)}">${esc(value)}</span></td>
+      <td><span class="item-labels">${labelsHtml}</span></td>
+      <td><button class="edit-btn" onclick="_startEdit(${idx})" title="編輯">✏️</button></td>`;
+    tbody.appendChild(tr);
   });
+
+  table.appendChild(tbody);
+  container.appendChild(table);
 }
 
 function _badgeCls(item) {
@@ -713,7 +711,7 @@ function _badgeLabel(item) {
 function _toggle(idx, cb) {
   _analyzeItems[idx].selected = cb.checked;
   const row = document.getElementById(`ai-row-${idx}`);
-  if (row) row.className = 'analyze-item' + (cb.checked ? '' : ' deselected');
+  if (row) row.className = cb.checked ? '' : 'deselected';
   _updateCount();
 }
 
