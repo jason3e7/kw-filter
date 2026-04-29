@@ -305,6 +305,37 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title">⚙️ 設定</div>
+      <div class="field-row" style="flex-direction:column;gap:0.55rem;">
+        <div>
+          <label class="field">keywords_file</label>
+          <input type="text" id="cfg-keywords-file" placeholder="keywords.txt">
+        </div>
+        <div>
+          <label class="field">ai4privacy_chunk_chars</label>
+          <input type="text" id="cfg-chunk-chars" placeholder="4000">
+        </div>
+        <div>
+          <label class="field">llm_url</label>
+          <input type="text" id="cfg-llm-url" placeholder="http://localhost:11434">
+        </div>
+        <div>
+          <label class="field">llm_model</label>
+          <input type="text" id="cfg-llm-model" placeholder="llama3">
+        </div>
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.82rem;color:var(--muted);">
+          <input type="checkbox" id="cfg-hf-offline" style="accent-color:var(--accent);width:14px;height:14px;">
+          hf_hub_offline（離線載入模型）
+        </label>
+      </div>
+      <div class="row-btns">
+        <button class="btn btn-primary" onclick="saveCfg()">儲存設定</button>
+        <button class="btn btn-muted" onclick="loadCfg()">重新載入</button>
+        <span id="cfg-stat" style="color:var(--muted);font-size:0.78rem;"></span>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── 中欄：Tokenised 檔案 ── -->
@@ -773,11 +804,51 @@ async function submitAnalyze() {
   if (pending) await _doUpload(pending);
 }
 
+// ── Config ───────────────────────────────────────────────────────────────────
+async function loadCfg() {
+  const stat = document.getElementById('cfg-stat');
+  stat.innerHTML = '<span class="spinner"></span>';
+  try {
+    const d = await fetch('/config').then(r => r.json());
+    document.getElementById('cfg-keywords-file').value  = d.keywords_file  ?? '';
+    document.getElementById('cfg-chunk-chars').value    = d.ai4privacy_chunk_chars ?? 4000;
+    document.getElementById('cfg-llm-url').value        = d.llm_url         ?? '';
+    document.getElementById('cfg-llm-model').value      = d.llm_model       ?? 'llama3';
+    document.getElementById('cfg-hf-offline').checked   = !!d.hf_hub_offline;
+    stat.textContent = '已載入';
+  } catch { stat.textContent = '載入失敗'; }
+}
+
+async function saveCfg() {
+  const stat = document.getElementById('cfg-stat');
+  const body = {
+    keywords_file:          document.getElementById('cfg-keywords-file').value.trim() || 'keywords.txt',
+    ai4privacy_chunk_chars: parseInt(document.getElementById('cfg-chunk-chars').value) || 4000,
+    llm_url:                document.getElementById('cfg-llm-url').value.trim(),
+    llm_model:              document.getElementById('cfg-llm-model').value.trim() || 'llama3',
+    hf_hub_offline:         document.getElementById('cfg-hf-offline').checked,
+  };
+  stat.innerHTML = '<span class="spinner"></span>';
+  const r = await fetch('/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (r.ok) {
+    toast('設定已儲存');
+    stat.textContent = '已儲存';
+  } else {
+    toast('儲存失敗 ' + r.status, false);
+    stat.textContent = '失敗';
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 checkServer();
 loadFiles();
 loadRestored();
 loadKw();
+loadCfg();
 </script>
 </body>
 </html>

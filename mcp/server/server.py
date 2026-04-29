@@ -39,24 +39,66 @@ from kw_tools import cmd_replace, cmd_restore  # noqa: E402
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-MCP_DIR       = Path(__file__).parent
-STORAGE       = MCP_DIR / "storage"           # tokenised uploads (visible via list_files)
-RESTORED      = MCP_DIR / "restored"          # restore output (NOT visible via list_files)
-MAPPING_FILE  = STORAGE / "_mapping.json"     # global accumulated mapping
-KEYWORDS_FILE = Path(os.environ.get("KW_KEYWORDS_FILE", MCP_DIR / "keywords.txt"))
+MCP_DIR      = Path(__file__).parent
+STORAGE      = MCP_DIR / "storage"
+RESTORED     = MCP_DIR / "restored"
+MAPPING_FILE = STORAGE / "_mapping.json"
+CONFIG_FILE  = MCP_DIR / "config.json"
 
 STORAGE.mkdir(exist_ok=True)
 RESTORED.mkdir(exist_ok=True)
 
+# ── Config ────────────────────────────────────────────────────────────────────
+
+_CONFIG_DEFAULTS: dict = {
+    "keywords_file":        "keywords.txt",
+    "hf_hub_offline":       True,
+    "ai4privacy_chunk_chars": 4000,
+    "llm_url":              "",
+    "llm_model":            "llama3",
+}
+
+
+def _load_config() -> dict:
+    cfg = dict(_CONFIG_DEFAULTS)
+    if CONFIG_FILE.exists():
+        try:
+            cfg.update(json.loads(CONFIG_FILE.read_text(encoding="utf-8")))
+        except Exception as e:
+            print(f"[kw-filter] config.json load error: {e} — using defaults", flush=True)
+    else:
+        # Write defaults so the user can see and edit the file
+        CONFIG_FILE.write_text(
+            json.dumps(_CONFIG_DEFAULTS, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[kw-filter] config.json not found — created with defaults at {CONFIG_FILE}", flush=True)
+    return cfg
+
+
+def _save_config(cfg: dict) -> None:
+    CONFIG_FILE.write_text(
+        json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+
+_CFG = _load_config()
+
+
+def _resolve_path(p: str) -> Path:
+    path = Path(p)
+    return path if path.is_absolute() else MCP_DIR / path
+
+
+KEYWORDS_FILE = _resolve_path(_CFG["keywords_file"])
+
 # ── LLM integration (optional) ────────────────────────────────────────────────
-# Set KW_LLM_URL to enable local LLM keyword extraction.
-# Example (Ollama): KW_LLM_URL=http://localhost:11434  KW_LLM_MODEL=llama3
-LLM_URL   = os.environ.get("KW_LLM_URL", "")
-LLM_MODEL = os.environ.get("KW_LLM_MODEL", "llama3")
+LLM_URL   = _CFG["llm_url"]
+LLM_MODEL = _CFG["llm_model"]
 
 # ── ai4privacy (optional) ─────────────────────────────────────────────────────
-# Must be set before importing ai4privacy so the model is loaded from local cache.
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
+if _CFG["hf_hub_offline"]:
+    os.environ["HF_HUB_OFFLINE"] = "1"
 _ai4privacy_protect = None
 try:
     from ai4privacy import protect as _ai4privacy_protect  # type: ignore
@@ -106,8 +148,8 @@ def _analyze_with_llm(content: str) -> list[str]:
     return []
 
 
-# ai4privacy model max is 1536 tokens; ~4 chars/token → 4000 chars is a safe chunk size
-_AI4PRIVACY_CHUNK_CHARS = int(os.environ.get("KW_AI4PRIVACY_CHUNK_CHARS", 4000))
+# ai4privacy model max is 1536 tokens; ~4 chars/token → default 4000 chars per chunk
+_AI4PRIVACY_CHUNK_CHARS: int = int(_CFG["ai4privacy_chunk_chars"])
 
 
 def _split_text_chunks(text: str, max_chars: int) -> list[str]:
@@ -222,7 +264,7 @@ def _analyze_content(content: str) -> list[dict]:
 # ── IP blacklist ──────────────────────────────────────────────────────────────
 # mcp/ip_blacklist.txt — one IP per line; lines starting with # are comments
 IP_BLACKLIST_FILE = MCP_DIR / "ip_blacklist.txt"
-_RESTRICTED = ("/docs", "/openapi.json", "/redoc", "/keywords", "/restored")
+_RESTRICTED = ("/docs", "/openapi.json", "/redoc", "/keywords", "/restored", "/config")
 
 
 def _load_blacklist() -> set[str]:
@@ -472,6 +514,31 @@ def put_keywords(body: TextBody):
     KEYWORDS_FILE.write_text(body.content, encoding="utf-8")
     lines = [l for l in body.content.splitlines() if l.strip() and not l.startswith("#")]
     return {"keywords_count": len(lines)}
+
+
+# ── Config management ────────────────────────────────────────────────────────
+
+@app.get("/config", summary="Get current config.json")
+def get_config():
+    return _CFG
+
+
+class ConfigBody(BaseModel):
+    keywords_file:          str  = "keywords.txt"
+    hf_hub_offline:         bool = True
+    ai4privacy_chunk_chars: int  = 4000
+    llm_url:                str  = ""
+    llm_model:              str  = "llama3"
+
+
+@app.put("/config", summary="Update config.json (restart required for some settings)")
+def put_config(body: ConfigBody):
+    new_cfg = body.model_dump()
+    _save_config(new_cfg)
+    _CFG.update(new_cfg)
+    return {"saved": True, "config": new_cfg,
+            "note": "keywords_file, llm_url, llm_model take effect immediately; "
+                    "hf_hub_offline and ai4privacy_chunk_chars require restart"}
 
 
 # ── Content analysis ──────────────────────────────────────────────────────────
