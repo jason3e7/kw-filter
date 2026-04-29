@@ -189,16 +189,17 @@ def _analyze_with_ai4privacy(content: str) -> list[dict]:
     server hang on large files. Set to 0 to disable the cap.
     """
     if _ai4privacy_protect is None:
-        return []
+        return [], []
 
+    warnings: list[str] = []
     total = len(content)
     if _AI4PRIVACY_MAX_CHARS > 0 and total > _AI4PRIVACY_MAX_CHARS:
-        print(
-            f"[kw-filter] ai4privacy: input {total} chars exceeds limit "
-            f"{_AI4PRIVACY_MAX_CHARS} — truncating (set ai4privacy_max_chars in "
-            f"config.json to adjust)",
-            flush=True,
+        msg = (
+            f"ai4privacy: 內容 {total:,} 字元超過上限 {_AI4PRIVACY_MAX_CHARS:,}，"
+            f"僅分析前 {_AI4PRIVACY_MAX_CHARS:,} 字元（可在 config.json 調整 ai4privacy_max_chars）"
         )
+        print(f"[kw-filter] {msg}", flush=True)
+        warnings.append(msg)
         content = content[:_AI4PRIVACY_MAX_CHARS]
 
     chunks = _split_text_chunks(content, _AI4PRIVACY_CHUNK_CHARS)
@@ -220,10 +221,10 @@ def _analyze_with_ai4privacy(content: str) -> list[dict]:
         except Exception as e:
             print(f"[kw-filter] ai4privacy chunk {i + 1}/{n} error: {e}", flush=True)
 
-    return [{"value": v, "labels": lc} for v, lc in agg.items()]
+    return [{"value": v, "labels": lc} for v, lc in agg.items()], warnings
 
 
-def _analyze_content(content: str) -> list[dict]:
+def _analyze_content(content: str) -> tuple[list[dict], list[str]]:
     seen: set[str] = set()
     seen_lower: set[str] = set()
     items: list[dict] = []
@@ -268,7 +269,8 @@ def _analyze_content(content: str) -> list[dict]:
                           "auto_select": False})
 
     # 5. ai4privacy PII detection
-    for pii in _analyze_with_ai4privacy(content):
+    pii_items, warnings = _analyze_with_ai4privacy(content)
+    for pii in pii_items:
         v = pii["value"]
         if v.lower() in seen_lower:
             continue
@@ -278,7 +280,7 @@ def _analyze_content(content: str) -> list[dict]:
         items.append({"value": v, "type": "PII", "subtype": primary,
                       "labels": labels, "auto_select": False})
 
-    return items
+    return items, warnings
 
 
 # ── IP blacklist ──────────────────────────────────────────────────────────────
@@ -546,11 +548,11 @@ class AnalyzeBody(BaseModel):
 
 @app.post("/analyze", summary="Detect IPs, domains, and hashes in text")
 def analyze(body: AnalyzeBody):
-    items = _analyze_content(body.content)
+    items, warnings = _analyze_content(body.content)
     counts: dict[str, int] = {}
     for item in items:
         counts[item["type"]] = counts.get(item["type"], 0) + 1
-    return {"items": items, "counts": counts, "total": len(items)}
+    return {"items": items, "counts": counts, "total": len(items), "warnings": warnings}
 
 
 class AppendKeywordsBody(BaseModel):

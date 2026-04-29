@@ -177,6 +177,13 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 .modal-body { flex: 1; overflow-y: auto; padding: 0 1.5rem; }
 .modal-body::-webkit-scrollbar { width: 4px; }
 .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.modal-warnings {
+  margin: 0.75rem 0 0; display: flex; flex-direction: column; gap: 0.4rem;
+}
+.modal-warning {
+  background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.4);
+  color: var(--warn); font-size: 0.78rem; padding: 0.45rem 0.8rem; border-radius: 6px;
+}
 
 .modal-footer {
   background: var(--bg2); border-top: 1px solid var(--border);
@@ -338,7 +345,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
     <button class="back-btn" onclick="closeAnalyzeModal()">← 返回</button>
     <button class="btn btn-muted btn-sm" id="sel-all-btn" onclick="_toggleSelectAll()">全選</button>
   </div>
-  <div class="modal-body" id="analyze-items"></div>
+  <div class="modal-body">
+    <div id="analyze-warnings" class="modal-warnings"></div>
+    <div id="analyze-items"></div>
+  </div>
   <div class="modal-footer">
     <span class="sel-count" id="sel-count"></span>
     <div id="modal-footer-btns" style="display:flex;gap:0.5rem;"></div>
@@ -574,7 +584,8 @@ function download(name, content) {
 
 // ── Analyze modal ─────────────────────────────────────────────────────────────
 let _analyzeItems = [];
-let _pendingUpload = null; // { type:'file', file } | { type:'text', name, content } | null
+let _pendingUpload   = null; // { type:'file', file } | { type:'text', name, content } | null
+let _pendingWarnings = [];   // warning strings from /analyze
 
 async function doAnalyze() {
   const content = document.getElementById('analyze-content').value;
@@ -593,15 +604,14 @@ async function doAnalyzeContent(content, pending, statEl) {
     });
     const d = await r.json();
     _pendingUpload = pending;
+    _pendingWarnings = d.warnings || [];
     if (!d.total) {
       if (statEl) statEl.textContent = '未偵測到任何目標';
-      // No items to review — proceed to upload directly if pending
       if (pending) { _pendingUpload = null; await _doUpload(pending); }
       return;
     }
     if (statEl) statEl.textContent = `偵測到 ${d.total} 個目標`;
     _analyzeItems = d.items.map(i => ({ ...i, selected: false, edited: null }));
-    _activeFilter = null;
     _openModal();
   } catch {
     if (statEl) statEl.textContent = '分析失敗';
@@ -611,6 +621,10 @@ async function doAnalyzeContent(content, pending, statEl) {
 
 function _openModal() {
   document.getElementById('analyze-modal').classList.remove('hidden');
+  const wc = document.getElementById('analyze-warnings');
+  wc.innerHTML = _pendingWarnings.length
+    ? _pendingWarnings.map(w => `<div class="modal-warning">⚠️ ${esc(w)}</div>`).join('')
+    : '';
   _renderItems();
   _updateCount();
   _renderFooterBtns();
