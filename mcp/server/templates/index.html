@@ -455,6 +455,9 @@ dz.addEventListener('drop', async e => {
 });
 
 async function uploadFile(file) {
+  let fileContent = null;
+  try { fileContent = await file.text(); } catch { /* binary, skip analysis */ }
+
   const fd = new FormData();
   fd.append('file', file);
   const r = await fetch('/files', { method: 'POST', body: fd });
@@ -464,6 +467,7 @@ async function uploadFile(file) {
   const d = await r.json();
   toast(`${d.name} 上傳成功，${d.tokens_created} 個 token`);
   loadFiles();
+  if (fileContent) await doAnalyzeContent(fileContent, null);
 }
 
 async function uploadText() {
@@ -480,8 +484,10 @@ async function uploadText() {
   if (!r.ok) { toast('上傳失敗 ' + r.status, false); return; }
   const d = await r.json();
   toast(`${d.name} 上傳成功，${d.tokens_created} 個 token`);
+  const analyzed = document.getElementById('txt-content').value;
   document.getElementById('txt-content').value = '';
   loadFiles();
+  await doAnalyzeContent(analyzed, null);
 }
 
 // ── Keywords ──────────────────────────────────────────────────────────────────
@@ -550,8 +556,11 @@ let _activeFilter = null; // null = show all
 async function doAnalyze() {
   const content = document.getElementById('analyze-content').value;
   if (!content.trim()) { toast('請輸入內容', false); return; }
-  const stat = document.getElementById('analyze-stat');
-  stat.innerHTML = '<span class="spinner"></span>';
+  await doAnalyzeContent(content, document.getElementById('analyze-stat'));
+}
+
+async function doAnalyzeContent(content, statEl) {
+  if (statEl) statEl.innerHTML = '<span class="spinner"></span>';
   try {
     const r = await fetch('/analyze', {
       method: 'POST',
@@ -559,12 +568,12 @@ async function doAnalyze() {
       body: JSON.stringify({ content })
     });
     const d = await r.json();
-    if (!d.total) { stat.textContent = '未偵測到任何目標'; return; }
-    stat.textContent = `偵測到 ${d.total} 個目標`;
-    _analyzeItems = d.items.map(i => ({ ...i, selected: i.auto_select, edited: null }));
+    if (!d.total) { if (statEl) statEl.textContent = '未偵測到任何目標'; return; }
+    if (statEl) statEl.textContent = `偵測到 ${d.total} 個目標`;
+    _analyzeItems = d.items.map(i => ({ ...i, selected: false, edited: null }));
     _activeFilter = null;
     _openModal();
-  } catch { stat.textContent = '分析失敗'; toast('分析失敗', false); }
+  } catch { if (statEl) statEl.textContent = '分析失敗'; toast('分析失敗', false); }
 }
 
 function _openModal() {
@@ -635,14 +644,14 @@ function _renderItems() {
 }
 
 function _badgeCls(item) {
-  if (item.type === 'IP') return item.subtype === 'PRIVATE' ? 'type-badge badge-private' : 'type-badge badge-ip';
+  if (item.type === 'IP')     return 'type-badge badge-ip';
   if (item.type === 'DOMAIN') return 'type-badge badge-domain';
   if (item.type === 'HASH')   return 'type-badge badge-hash';
   return 'type-badge badge-llm';
 }
 
 function _badgeLabel(item) {
-  if (item.type === 'IP') return item.subtype === 'PRIVATE' ? 'IP·私有' : 'IP·公開';
+  if (item.type === 'IP')     return 'IP';
   if (item.type === 'DOMAIN') return 'DOMAIN';
   if (item.type === 'HASH')   return item.subtype || 'HASH';
   return 'LLM';

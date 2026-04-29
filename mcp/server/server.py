@@ -106,7 +106,7 @@ def _analyze_content(content: str) -> list[dict]:
         seen.add(v)
         sub = _ip_subtype(v)
         items.append({"value": v, "type": "IP", "subtype": sub,
-                      "auto_select": sub == "PUBLIC"})
+                      "auto_select": False})
 
     ip_set = {i["value"] for i in items}
 
@@ -117,7 +117,7 @@ def _analyze_content(content: str) -> list[dict]:
             continue
         seen.add(v)
         items.append({"value": v, "type": "DOMAIN", "subtype": None,
-                      "auto_select": True})
+                      "auto_select": False})
 
     # 3. Hashes — greedy match gives longest hex run, classify by exact length
     for m in _HASH_RE.finditer(content):
@@ -127,7 +127,7 @@ def _analyze_content(content: str) -> list[dict]:
             continue
         seen.add(v)
         items.append({"value": v, "type": "HASH", "subtype": sub,
-                      "auto_select": True})
+                      "auto_select": False})
 
     # 4. LLM-extracted keywords (placeholder)
     for v in _analyze_with_llm(content):
@@ -135,7 +135,7 @@ def _analyze_content(content: str) -> list[dict]:
         if v and v not in seen:
             seen.add(v)
             items.append({"value": v, "type": "LLM", "subtype": None,
-                          "auto_select": True})
+                          "auto_select": False})
 
     return items
 
