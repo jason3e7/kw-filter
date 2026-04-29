@@ -51,11 +51,18 @@ RESTORED.mkdir(exist_ok=True)
 # ── Config ────────────────────────────────────────────────────────────────────
 
 _CONFIG_DEFAULTS: dict = {
-    "keywords_file":        "keywords.txt",
-    "hf_hub_offline":       True,
-    "ai4privacy_chunk_chars": 4000,
-    "llm_url":              "",
-    "llm_model":            "llama3",
+    "keywords_file":          "keywords.txt",
+    # hf_hub_offline: load ai4privacy model from local cache (no network)
+    "hf_hub_offline":         True,
+    # ai4privacy_chunk_chars: chars per chunk sent to the PII model (max ~1536 tokens)
+    # Dense content (logs, code) can be ~1 char/token; 1200 chars ≈ 1200 tokens worst case
+    "ai4privacy_chunk_chars": 1200,
+    # ip_blacklist: list of IPs blocked from /docs /keywords /restored
+    "ip_blacklist":           [],
+    # llm_url / llm_model: reserved for future local LLM keyword extraction (Ollama etc.)
+    # Leave llm_url empty to disable; currently has no effect
+    "llm_url":                "",
+    "llm_model":              "llama3",
 }
 
 
@@ -262,16 +269,17 @@ def _analyze_content(content: str) -> list[dict]:
 
 
 # ── IP blacklist ──────────────────────────────────────────────────────────────
-# mcp/ip_blacklist.txt — one IP per line; lines starting with # are comments
-IP_BLACKLIST_FILE = MCP_DIR / "ip_blacklist.txt"
-_RESTRICTED = ("/docs", "/openapi.json", "/redoc", "/keywords", "/restored", "/config")
+_RESTRICTED = ("/docs", "/openapi.json", "/redoc", "/keywords", "/restored")
 
 
 def _load_blacklist() -> set[str]:
-    if not IP_BLACKLIST_FILE.exists():
-        return set()
-    lines = IP_BLACKLIST_FILE.read_text(encoding="utf-8").splitlines()
-    return {l.strip() for l in lines if l.strip() and not l.startswith("#")}
+    """Re-reads config.json each call so edits take effect without restart."""
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        entries = cfg.get("ip_blacklist", [])
+    except Exception:
+        entries = _CFG.get("ip_blacklist", [])
+    return {e.strip() for e in entries if isinstance(e, str) and e.strip()}
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -281,7 +289,7 @@ def _require_keywords() -> Path:
         raise HTTPException(
             503,
             f"keywords.txt not found at {KEYWORDS_FILE}. "
-            "Create mcp/keywords.txt or set KW_KEYWORDS_FILE env var."
+            "Create mcp/server/keywords.txt or set keywords_file in config.json."
         )
     return KEYWORDS_FILE
 
@@ -514,31 +522,6 @@ def put_keywords(body: TextBody):
     KEYWORDS_FILE.write_text(body.content, encoding="utf-8")
     lines = [l for l in body.content.splitlines() if l.strip() and not l.startswith("#")]
     return {"keywords_count": len(lines)}
-
-
-# ── Config management ────────────────────────────────────────────────────────
-
-@app.get("/config", summary="Get current config.json")
-def get_config():
-    return _CFG
-
-
-class ConfigBody(BaseModel):
-    keywords_file:          str  = "keywords.txt"
-    hf_hub_offline:         bool = True
-    ai4privacy_chunk_chars: int  = 4000
-    llm_url:                str  = ""
-    llm_model:              str  = "llama3"
-
-
-@app.put("/config", summary="Update config.json (restart required for some settings)")
-def put_config(body: ConfigBody):
-    new_cfg = body.model_dump()
-    _save_config(new_cfg)
-    _CFG.update(new_cfg)
-    return {"saved": True, "config": new_cfg,
-            "note": "keywords_file, llm_url, llm_model take effect immediately; "
-                    "hf_hub_offline and ai4privacy_chunk_chars require restart"}
 
 
 # ── Content analysis ──────────────────────────────────────────────────────────

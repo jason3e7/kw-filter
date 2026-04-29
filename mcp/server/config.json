@@ -1,7 +1,8 @@
 {
   "keywords_file": "keywords.txt",
   "hf_hub_offline": true,
-  "ai4privacy_chunk_chars": 4000,
+  "ai4privacy_chunk_chars": 1200,
+  "ip_blacklist": [],
   "llm_url": "",
   "llm_model": "llama3"
 }
