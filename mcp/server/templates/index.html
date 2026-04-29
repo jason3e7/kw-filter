@@ -184,29 +184,43 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 }
 .sel-count { flex: 1; color: var(--muted); font-size: 0.85rem; }
 
-/* ── Analyze item rows ── */
+/* ── Analyze table ── */
+/* columns: [checkbox] [type] [value] [labels] [edit] */
+.analyze-table-header,
 .analyze-item {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.52rem 0.4rem; border-bottom: 1px solid rgba(51,65,85,0.45);
+  display: grid;
+  grid-template-columns: 28px 84px 1fr 220px 28px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.75rem;
+}
+.analyze-table-header {
+  position: sticky; top: 0; background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted); font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.4px; z-index: 1;
+}
+.analyze-item {
+  border-bottom: 1px solid rgba(51,65,85,0.35);
   transition: background 0.1s;
 }
-.analyze-item:hover { background: rgba(30,41,59,0.5); border-radius: 4px; }
+.analyze-item:hover { background: rgba(30,41,59,0.5); }
 .analyze-item.deselected { opacity: 0.35; }
 .analyze-item input[type=checkbox] {
-  width: 15px; height: 15px; accent-color: var(--accent); flex-shrink: 0; cursor: pointer;
+  width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; justify-self: center;
 }
 .edit-btn {
   background: none; border: none; color: var(--muted); cursor: pointer;
   font-size: 0.78rem; padding: 0.1rem 0.3rem; border-radius: 3px;
-  flex-shrink: 0; opacity: 0; transition: opacity 0.1s;
+  opacity: 0; transition: opacity 0.1s; justify-self: center;
 }
 .analyze-item:hover .edit-btn { opacity: 1; }
 .edit-btn:hover { color: var(--white); background: var(--border); }
 
 .type-badge {
   font-size: 0.67rem; font-weight: 700; padding: 0.14rem 0.5rem;
-  border-radius: 4px; min-width: 60px; text-align: center;
-  flex-shrink: 0; letter-spacing: 0.3px; text-transform: uppercase;
+  border-radius: 4px; text-align: center;
+  letter-spacing: 0.3px; text-transform: uppercase; width: 100%;
 }
 .badge-ip      { background: #14532d; color: #4ade80; }
 .badge-private { background: #78350f; color: #fbbf24; }
@@ -215,21 +229,19 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.9rem 0; }
 .badge-llm     { background: #1e1b4b; color: #a78bfa; }
 .badge-pii     { background: #4a1942; color: #f0abfc; }
 
-.item-labels { display: flex; gap: 0.25rem; flex-wrap: wrap; flex-shrink: 0; }
+.item-value {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.item-labels { display: flex; gap: 0.25rem; flex-wrap: wrap; }
 .item-label-tag {
   font-size: 0.67rem; padding: 0.1rem 0.4rem; border-radius: 3px;
   background: rgba(255,255,255,0.07); color: var(--muted); white-space: nowrap;
 }
-
-.item-value {
-  font-family: 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 0.85rem; flex: 1; word-break: break-all;
-}
-.item-right-tag { color: var(--muted); font-size: 0.72rem; flex-shrink: 0; margin-left: auto; }
 .item-edit-input {
-  flex: 1; background: var(--bg3); border: 1px solid var(--accent);
+  background: var(--bg3); border: 1px solid var(--accent);
   border-radius: 4px; color: var(--white); font-family: monospace;
-  font-size: 0.85rem; padding: 0.22rem 0.55rem;
+  font-size: 0.85rem; padding: 0.22rem 0.55rem; width: 100%;
 }
 </style>
 </head>
@@ -653,22 +665,31 @@ function _renderItems() {
   const container = document.getElementById('analyze-items');
   container.innerHTML = '';
   if (!_analyzeItems.length) { container.innerHTML = '<div class="empty">無偵測結果</div>'; return; }
+
+  const hdr = document.createElement('div');
+  hdr.className = 'analyze-table-header';
+  hdr.innerHTML = '<span></span><span>類型</span><span>值</span><span>標籤</span><span></span>';
+  container.appendChild(hdr);
+
   _analyzeItems.forEach((item, idx) => {
     const value = item.edited !== null ? item.edited : item.value;
+    // Labels column: PII → label×count tags; HASH → subtype tag; others → empty
+    let labelsHtml = '';
+    if (item.labels) {
+      labelsHtml = Object.entries(item.labels)
+        .map(([l, c]) => `<span class="item-label-tag">${esc(l)}×${c}</span>`).join('');
+    } else if (item.type === 'HASH' && item.subtype) {
+      labelsHtml = `<span class="item-label-tag">${esc(item.subtype)}</span>`;
+    }
     const row = document.createElement('div');
     row.className = 'analyze-item' + (item.selected ? '' : ' deselected');
     row.id = `ai-row-${idx}`;
-    const labelsHtml = item.labels
-      ? Object.entries(item.labels).map(([l, c]) =>
-          `<span class="item-label-tag">${esc(l)}×${c}</span>`).join('')
-      : '';
     row.innerHTML = `
       <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="_toggle(${idx}, this)">
       <span class="${_badgeCls(item)}">${_badgeLabel(item)}</span>
-      <span class="item-value" id="ai-val-${idx}">${esc(value)}</span>
-      ${labelsHtml ? `<span class="item-labels">${labelsHtml}</span>` : ''}
-      <button class="edit-btn" onclick="_startEdit(${idx})" title="編輯">✏️</button>
-      ${item.subtype && item.type === 'HASH' ? `<span class="item-right-tag">${item.subtype}</span>` : ''}`;
+      <span class="item-value" id="ai-val-${idx}" title="${esc(value)}">${esc(value)}</span>
+      <span class="item-labels">${labelsHtml}</span>
+      <button class="edit-btn" onclick="_startEdit(${idx})" title="編輯">✏️</button>`;
     container.appendChild(row);
   });
 }
