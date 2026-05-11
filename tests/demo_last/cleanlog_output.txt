@@ -1,0 +1,4 @@
+root     tty1                          Sat May 10 18:00   still logged in
+reboot   system boot  5.15.0-71-generic Fri May  9 08:55
+
+wtmp begins Fri May  9 08:55:00 2026

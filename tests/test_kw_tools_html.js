@@ -341,6 +341,76 @@ test('demo: cleanlog removes 8 lines with IPs, keeps 2 comment lines', () => {
   assert(!r.text.includes('127.0.0'));
 });
 
+// ── Demo scenario: last command output (demo_last/) ──────────────────────────
+
+console.log('\ndemo_last scenario');
+
+const LAST_INPUT = [
+  'alice    pts/0        203.0.113.15     Sun May 11 10:23   still logged in',
+  'bob      pts/1        198.51.100.42    Sun May 11 09:15 - 10:01  (00:46)',
+  'alice    pts/0        203.0.113.15     Sat May 10 22:11 - 23:05  (00:54)',
+  'charlie  pts/2        192.0.2.88       Sat May 10 20:33 - 21:10  (00:37)',
+  'root     tty1                          Sat May 10 18:00   still logged in',
+  'bob      pts/3        198.51.100.42    Sat May 10 15:22 - 17:48  (02:26)',
+  'mallory  pts/4        45.33.32.156     Sat May 10 14:05 - 14:06  (00:01)',
+  'alice    pts/1        203.0.113.15     Fri May  9 11:30 - 13:20  (01:50)',
+  'charlie  pts/0        192.0.2.88       Fri May  9 09:00 - 10:15  (01:15)',
+  'reboot   system boot  5.15.0-71-generic Fri May  9 08:55',
+  '',
+  'wtmp begins Fri May  9 08:55:00 2026',
+].join('\n');
+
+const LAST_KWS    = ['\\d+\\.\\d+\\.\\d+\\.\\d+'];
+const LAST_RXMODE = true;
+
+test('last: search finds 8 IP occurrences', () => {
+  const matches = opSearch(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  assertEqual(matches.length, 8);
+});
+
+test('last: search finds 4 unique IPs', () => {
+  const matches = opSearch(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  const unique = [...new Set(matches.map(m => m.kw))];
+  assertEqual(unique.length, 4);
+});
+
+test('last: kernel version 5.15.0-71-generic is not matched as IP', () => {
+  const matches = opSearch(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  assert(!matches.some(m => m.ctx.includes('reboot')), 'reboot line should not contain IP match');
+});
+
+test('last: replace produces 4 tokens for 4 distinct IPs', () => {
+  const r = opReplace(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  assertEqual(Object.keys(r.mapping).length, 4);
+  const vals = Object.values(r.mapping);
+  for (const ip of ['203.0.113.15', '198.51.100.42', '192.0.2.88', '45.33.32.156'])
+    assert(vals.includes(ip), `mapping missing ${ip}`);
+});
+
+test('last: alice IP (203.0.113.15) reused across 3 sessions', () => {
+  const r = opReplace(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  const tok = Object.keys(r.mapping).find(t => r.mapping[t] === '203.0.113.15');
+  const count = (r.text.match(new RegExp(tok.replace(/[[\]]/g, '\\$&'), 'g')) || []).length;
+  assertEqual(count, 3, 'alice token should appear 3 times');
+});
+
+test('last: replace keeps root / reboot / wtmp lines untouched', () => {
+  const r = opReplace(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  assert(r.text.includes('root     tty1'));
+  assert(r.text.includes('5.15.0-71-generic'));
+  assert(r.text.includes('wtmp begins'));
+});
+
+test('last: cleanlog removes 8 remote-login lines, keeps 5 local lines', () => {
+  const r = opCleanlog(LAST_INPUT, LAST_KWS, LAST_RXMODE);
+  assertEqual(r.removed, 8);
+  assertEqual(r.kept,    4);   // root, reboot, blank line, wtmp begins
+  assert(r.text.includes('root     tty1'));
+  assert(r.text.includes('wtmp begins'));
+  assert(!r.text.includes('alice'));
+  assert(!r.text.includes('mallory'));
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(40)}`);

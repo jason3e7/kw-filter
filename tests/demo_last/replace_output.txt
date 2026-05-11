@@ -1,0 +1,12 @@
+alice    pts/0        [[KW_00000001]]     Sun May 11 10:23   still logged in
+bob      pts/1        [[KW_00000002]]    Sun May 11 09:15 - 10:01  (00:46)
+alice    pts/0        [[KW_00000001]]     Sat May 10 22:11 - 23:05  (00:54)
+charlie  pts/2        [[KW_00000003]]       Sat May 10 20:33 - 21:10  (00:37)
+root     tty1                          Sat May 10 18:00   still logged in
+bob      pts/3        [[KW_00000002]]    Sat May 10 15:22 - 17:48  (02:26)
+mallory  pts/4        [[KW_00000004]]     Sat May 10 14:05 - 14:06  (00:01)
+alice    pts/1        [[KW_00000001]]     Fri May  9 11:30 - 13:20  (01:50)
+charlie  pts/0        [[KW_00000003]]       Fri May  9 09:00 - 10:15  (01:15)
+reboot   system boot  5.15.0-71-generic Fri May  9 08:55
+
+wtmp begins Fri May  9 08:55:00 2026

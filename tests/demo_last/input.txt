@@ -1,0 +1,12 @@
+alice    pts/0        203.0.113.15     Sun May 11 10:23   still logged in
+bob      pts/1        198.51.100.42    Sun May 11 09:15 - 10:01  (00:46)
+alice    pts/0        203.0.113.15     Sat May 10 22:11 - 23:05  (00:54)
+charlie  pts/2        192.0.2.88       Sat May 10 20:33 - 21:10  (00:37)
+root     tty1                          Sat May 10 18:00   still logged in
+bob      pts/3        198.51.100.42    Sat May 10 15:22 - 17:48  (02:26)
+mallory  pts/4        45.33.32.156     Sat May 10 14:05 - 14:06  (00:01)
+alice    pts/1        203.0.113.15     Fri May  9 11:30 - 13:20  (01:50)
+charlie  pts/0        192.0.2.88       Fri May  9 09:00 - 10:15  (01:15)
+reboot   system boot  5.15.0-71-generic Fri May  9 08:55
+
+wtmp begins Fri May  9 08:55:00 2026
