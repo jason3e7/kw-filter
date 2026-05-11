@@ -1,0 +1,10 @@
+# Server inventory
+server [[KW_00000001]] role=web
+server [[KW_00000002]] role=web
+server [[KW_00000003]]  role=db
+server [[KW_00000004]]  role=db
+server [[KW_00000005]] role=cache
+# Firewall rules
+allow [[KW_00000001]] -> [[KW_00000003]] port=5432
+allow [[KW_00000002]] -> [[KW_00000004]] port=5432
+deny [[KW_00000006]]/0

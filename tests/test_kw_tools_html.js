@@ -271,6 +271,76 @@ test('regex: removes lines matching pattern', () => {
   assert(r.text.includes('normal log line'));
 });
 
+// ── Demo scenario: server inventory (demo_regex_ip/) ─────────────────────────
+// Input / expected outputs correspond to files in tests/demo_regex_ip/
+
+console.log('\ndemo_regex_ip scenario');
+
+const DEMO_INPUT = [
+  '# Server inventory',
+  'server 127.0.0.1 role=web',
+  'server 127.0.0.2 role=web',
+  'server 10.0.0.1  role=db',
+  'server 10.0.0.2  role=db',
+  'server 192.168.1.100 role=cache',
+  '# Firewall rules',
+  'allow 127.0.0.1 -> 10.0.0.1 port=5432',
+  'allow 127.0.0.2 -> 10.0.0.2 port=5432',
+  'deny 0.0.0.0/0',
+].join('\n');
+
+const DEMO_KWS   = ['\\d+\\.\\d+\\.\\d+\\.\\d+'];
+const DEMO_RXMODE = true;
+
+test('demo: search finds 10 IP occurrences across 8 lines', () => {
+  const matches = opSearch(DEMO_INPUT, DEMO_KWS, DEMO_RXMODE);
+  assertEqual(matches.length, 10);
+  // unique IPs matched
+  const unique = [...new Set(matches.map(m => m.kw))];
+  assertEqual(unique.length, 6, 'should find 6 distinct IPs');
+});
+
+test('demo: search line numbers are correct', () => {
+  const matches = opSearch(DEMO_INPUT, DEMO_KWS, DEMO_RXMODE);
+  // first match is 127.0.0.1 on line 2
+  assertEqual(matches[0].line, 2);
+  assertEqual(matches[0].kw,   '127.0.0.1');
+  // last match is 0.0.0.0 on line 10
+  assertEqual(matches[matches.length - 1].line, 10);
+  assertEqual(matches[matches.length - 1].kw,   '0.0.0.0');
+});
+
+test('demo: replace produces 6 unique tokens for 6 distinct IPs', () => {
+  const r = opReplace(DEMO_INPUT, DEMO_KWS, DEMO_RXMODE);
+  assertEqual(Object.keys(r.mapping).length, 6);
+  const vals = Object.values(r.mapping);
+  for (const ip of ['127.0.0.1','127.0.0.2','10.0.0.1','10.0.0.2','192.168.1.100','0.0.0.0'])
+    assert(vals.includes(ip), `mapping missing ${ip}`);
+});
+
+test('demo: replace reuses token for repeated IP (127.0.0.1 appears twice)', () => {
+  const r = opReplace(DEMO_INPUT, DEMO_KWS, DEMO_RXMODE);
+  // 127.0.0.1 appears on line 2 and line 8 — both should use same token
+  const tok = Object.keys(r.mapping).find(t => r.mapping[t] === '127.0.0.1');
+  const count = (r.text.match(new RegExp(tok.replace(/[[\]]/g,'\\$&'), 'g')) || []).length;
+  assertEqual(count, 2, '127.0.0.1 token should appear twice');
+});
+
+test('demo: replace output contains no raw IPs', () => {
+  const r = opReplace(DEMO_INPUT, DEMO_KWS, DEMO_RXMODE);
+  const ipPat = /\d+\.\d+\.\d+\.\d+/;
+  assert(!ipPat.test(r.text), 'replace output should contain no raw IPs');
+});
+
+test('demo: cleanlog removes 8 lines with IPs, keeps 2 comment lines', () => {
+  const r = opCleanlog(DEMO_INPUT, DEMO_KWS, DEMO_RXMODE);
+  assertEqual(r.removed, 8);
+  assertEqual(r.kept,    2);   // "# Server inventory" + "# Firewall rules"
+  assert(r.text.includes('# Server inventory'));
+  assert(r.text.includes('# Firewall rules'));
+  assert(!r.text.includes('127.0.0'));
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(40)}`);

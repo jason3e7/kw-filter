@@ -1,0 +1,10 @@
+# Server inventory
+server 127.0.0.1 role=web
+server 127.0.0.2 role=web
+server 10.0.0.1  role=db
+server 10.0.0.2  role=db
+server 192.168.1.100 role=cache
+# Firewall rules
+allow 127.0.0.1 -> 10.0.0.1 port=5432
+allow 127.0.0.2 -> 10.0.0.2 port=5432
+deny 0.0.0.0/0
