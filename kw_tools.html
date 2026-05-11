@@ -235,6 +235,9 @@
       <label>Keywords（一行一個）</label>
       <textarea id="keywords" rows="7"
         placeholder="John Doe&#10;acme-corp.com&#10;sk-live-abc123&#10;# 以 # 開頭的行為註解"></textarea>
+      <label style="margin-top:8px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400">
+        <input type="checkbox" id="regex-mode"> Regex 模式
+      </label>
     </div>
 
     <div class="sect hidden" id="remap-sect">
@@ -344,10 +347,20 @@ function _fmtSize(n) {
 function escRe(s)   { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function buildPattern(kws) {
+function isRegexMode() {
+  return document.getElementById('regex-mode').checked;
+}
+
+function buildPattern(kws, regexMode = false) {
   const sorted = [...kws].filter(k => k.trim()).sort((a, b) => b.length - a.length);
   if (!sorted.length) return null;
-  return new RegExp(sorted.map(escRe).join('|'), 'gi');
+  const parts = regexMode ? sorted.map(k => `(?:${k})`) : sorted.map(escRe);
+  try {
+    return new RegExp(parts.join('|'), 'gi');
+  } catch (e) {
+    status('❌  Regex 語法錯誤：' + e.message);
+    return null;
+  }
 }
 
 function getKeywords() {
@@ -374,8 +387,8 @@ function randHex(n) {
 
 // ── Operations ──────────────────────────────────────────────────────────────
 
-function opSearch(text, kws) {
-  const pat = buildPattern(kws);
+function opSearch(text, kws, regexMode = false) {
+  const pat = buildPattern(kws, regexMode);
   if (!pat) return [];
   const results = [];
   text.split('\n').forEach((line, li) => {
@@ -387,15 +400,15 @@ function opSearch(text, kws) {
   return results;
 }
 
-function opClear(text, kws, replacement) {
-  const pat = buildPattern(kws);
+function opClear(text, kws, replacement, regexMode = false) {
+  const pat = buildPattern(kws, regexMode);
   if (!pat) return { text, count: 0 };
   let count = 0;
   return { text: text.replace(pat, () => { count++; return replacement; }), count };
 }
 
-function opReplace(text, kws) {
-  const pat = buildPattern(kws);
+function opReplace(text, kws, regexMode = false) {
+  const pat = buildPattern(kws, regexMode);
   if (!pat) return { text, mapping: {} };
   const canonical = {};
   kws.forEach(k => canonical[k.toLowerCase()] = k);
@@ -420,8 +433,8 @@ function opRestore(text, jsonStr) {
   return { text: text.replace(pat, m => { count++; return mapping[m]; }), count };
 }
 
-function opCleanlog(text, kws) {
-  const pat = buildPattern(kws);
+function opCleanlog(text, kws, regexMode = false) {
+  const pat = buildPattern(kws, regexMode);
   if (!pat) return { text, removed: 0, kept: 0 };
   const lines = text.split('\n');
   const kept = []; let removed = 0;
@@ -494,11 +507,12 @@ function process() {
   if (!text.trim()) { status('⚠️  請先輸入文字'); return; }
 
   let out = '', info = null;
+  const rxMode = isRegexMode();
 
   if (op === 'search') {
     const kws = getKeywords();
     if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
-    const matches = opSearch(text, kws);
+    const matches = opSearch(text, kws, rxMode);
     if (!matches.length) { out = '（未找到任何關鍵字）'; status('未找到關鍵字'); }
     else {
       out = matches.map(m => `L${m.line}:${m.col}  [${m.kw}]  ${m.ctx.trim()}`).join('\n');
@@ -510,7 +524,7 @@ function process() {
     const kws = getKeywords();
     if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
     const repl = document.getElementById('replacement').value;
-    const r = opClear(text, kws, repl);
+    const r = opClear(text, kws, repl, rxMode);
     out = r.text;
     status(`已清除 ${r.count} 個關鍵字`);
     info = { type: 'stats', rows: [['替換次數', r.count], ['輸出字元', r.text.length]] };
@@ -518,7 +532,7 @@ function process() {
   } else if (op === 'replace') {
     const kws = getKeywords();
     if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
-    const r = opReplace(text, kws);
+    const r = opReplace(text, kws, rxMode);
     out = r.text;
     const mapStr = JSON.stringify(r.mapping, null, 2);
     document.getElementById('mapping-json').value = mapStr;
@@ -537,7 +551,7 @@ function process() {
   } else if (op === 'cleanlog') {
     const kws = getKeywords();
     if (!kws.length) { status('⚠️  請輸入關鍵字'); return; }
-    const r = opCleanlog(text, kws);
+    const r = opCleanlog(text, kws, rxMode);
     out = r.text;
     const tot = r.removed + r.kept;
     const pct = tot ? ((r.removed / tot) * 100).toFixed(1) : '0.0';
