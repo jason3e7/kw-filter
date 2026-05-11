@@ -44,11 +44,19 @@ def sorted_keywords(keywords: list[str]) -> list[str]:
     return sorted(keywords, key=len, reverse=True)
 
 
-def build_pattern(keywords: list[str], ignore_case: bool = False) -> re.Pattern:
+def build_pattern(keywords: list[str], ignore_case: bool = False,
+                  regex_mode: bool = False) -> re.Pattern:
     """Compile all keywords into one regex for efficient multi-keyword search."""
-    parts = [re.escape(kw) for kw in sorted_keywords(keywords)]
+    if regex_mode:
+        parts = [f"(?:{kw})" for kw in sorted_keywords(keywords)]
+    else:
+        parts = [re.escape(kw) for kw in sorted_keywords(keywords)]
     flags = re.IGNORECASE if ignore_case else 0
-    return re.compile("|".join(parts), flags)
+    try:
+        return re.compile("|".join(parts), flags)
+    except re.error as e:
+        print(f"[error] invalid regex pattern: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ── File discovery ─────────────────────────────────────────────────────────────
@@ -100,7 +108,7 @@ def cmd_search(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords, True)
+    pattern = build_pattern(keywords, True, getattr(args, "regex", False))
     matches: list[Match] = []
 
     for fpath in iter_files(args.target, True, args.binary):
@@ -156,7 +164,7 @@ def cmd_clear(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords, True)
+    pattern = build_pattern(keywords, True, getattr(args, "regex", False))
     replacement = args.replacement  # default ""
     dry_run = getattr(args, "dry_run", False)
 
@@ -202,7 +210,7 @@ def cmd_replace(args: argparse.Namespace) -> None:
         return
 
     dry_run = getattr(args, "dry_run", False)
-    pattern = build_pattern(keywords, True)
+    pattern = build_pattern(keywords, True, getattr(args, "regex", False))
     mapping: dict[str, str] = {}   # token -> canonical keyword
     changed_files = 0
 
@@ -321,7 +329,7 @@ def cmd_cleanlog(args: argparse.Namespace) -> None:
     if not keywords:
         return
 
-    pattern = build_pattern(keywords, True)
+    pattern = build_pattern(keywords, True, getattr(args, "regex", False))
     total_removed = 0
     total_kept = 0
 
@@ -454,7 +462,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # shared flags
     def add_common(sp, need_keywords=True, need_target=True, need_backup=True,
-                   need_dry_run=False):
+                   need_dry_run=False, need_regex=False):
         if need_keywords:
             sp.add_argument("-k", "--keywords", required=True,
                             metavar="FILE", help="keyword list file (one per line)")
@@ -467,10 +475,13 @@ def build_parser() -> argparse.ArgumentParser:
         if need_dry_run:
             sp.add_argument("--dry-run", action="store_true",
                             help="preview changes without modifying files")
+        if need_regex:
+            sp.add_argument("--regex", action="store_true",
+                            help="treat each keyword line as a regex pattern")
 
     # search
     s1 = sub.add_parser("search", help="find all keyword occurrences")
-    add_common(s1, need_backup=False)
+    add_common(s1, need_backup=False, need_regex=True)
     s1.add_argument("--binary", action="store_true",
                     help="also search binary files")
     s1.add_argument("-o", "--output", metavar="JSON",
@@ -479,14 +490,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     # clear
     s2 = sub.add_parser("clear", help="erase keywords from files")
-    add_common(s2, need_dry_run=True)
+    add_common(s2, need_dry_run=True, need_regex=True)
     s2.add_argument("--replacement", default="",
                     help="string to replace keywords with (default: empty)")
     s2.set_defaults(func=cmd_clear)
 
     # replace
     s3 = sub.add_parser("replace", help="replace keywords with tokens")
-    add_common(s3, need_dry_run=True)
+    add_common(s3, need_dry_run=True, need_regex=True)
     s3.add_argument("-m", "--mapping", default="mapping.json",
                     metavar="JSON", help="output mapping table path (default: mapping.json)")
     s3.set_defaults(func=cmd_replace)
@@ -500,7 +511,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # cleanlog
     s5 = sub.add_parser("cleanlog", help="drop every line containing a keyword")
-    add_common(s5)
+    add_common(s5, need_regex=True)
     s5.add_argument("--dry-run", action="store_true",
                     help="preview which lines would be removed without modifying files")
     s5.add_argument("--stats", action="store_true",
