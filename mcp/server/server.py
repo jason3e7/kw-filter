@@ -35,7 +35,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 import uvicorn
 
-from kw_tools import cmd_replace, cmd_restore  # noqa: E402
+from kw_tools import cmd_replace, cmd_restore, load_keywords, sorted_keywords  # noqa: E402
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -299,6 +299,17 @@ def _load_blacklist() -> set[str]:
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+def _build_pattern(keywords: list[str], regex_mode: bool) -> re.Pattern:
+    """Compile keywords into a pattern; raises HTTP 422 on invalid regex."""
+    parts = ([f"(?:{kw})" for kw in sorted_keywords(keywords)]
+             if regex_mode else
+             [re.escape(kw) for kw in sorted_keywords(keywords)])
+    try:
+        return re.compile("|".join(parts), re.IGNORECASE)
+    except re.error as e:
+        raise HTTPException(422, f"invalid regex pattern: {e}")
+
+
 def _require_keywords() -> Path:
     if not KEYWORDS_FILE.exists():
         raise HTTPException(
@@ -326,7 +337,7 @@ def _store(name: str, content: bytes, extra: dict | None = None) -> dict:
     return meta
 
 
-def _run_replace(src_name: str, src_bytes: bytes) -> tuple[bytes, int]:
+def _run_replace(src_name: str, src_bytes: bytes, regex: bool = False) -> tuple[bytes, int]:
     """Replace keywords in src_bytes; merge new tokens into global mapping.
     Returns (tokenized_bytes, tokens_created)."""
     kw = _require_keywords()
@@ -343,6 +354,7 @@ def _run_replace(src_name: str, src_bytes: bytes) -> tuple[bytes, int]:
             mapping=str(tmp_mapping),
             backup=False,
             dry_run=False,
+            regex=regex,
         )
         cmd_replace(ns)
 
@@ -424,21 +436,22 @@ def web_ui():
 # ── File endpoints ────────────────────────────────────────────────────────────
 
 @app.post("/files", summary="Upload file (multipart) — auto replace runs immediately")
-async def upload_file(file: UploadFile):
+async def upload_file(file: UploadFile, regex: bool = False):
     src = await file.read()
     name = file.filename or "upload.bin"
-    tokenized, n = _run_replace(name, src)
+    tokenized, n = _run_replace(name, src, regex)
     return _store(name, tokenized, extra={"tokens_created": n})
 
 
 class TextBody(BaseModel):
     name: str
     content: str
+    regex: bool = False
 
 
 @app.post("/files/text", summary="Upload text content — auto replace runs immediately")
 def upload_text(body: TextBody):
-    tokenized, n = _run_replace(body.name, body.content.encode("utf-8"))
+    tokenized, n = _run_replace(body.name, body.content.encode("utf-8"), body.regex)
     return _store(body.name, tokenized, extra={"tokens_created": n})
 
 
@@ -553,6 +566,57 @@ def analyze(body: AnalyzeBody):
     for item in items:
         counts[item["type"]] = counts.get(item["type"], 0) + 1
     return {"items": items, "counts": counts, "total": len(items), "warnings": warnings}
+
+
+class SearchBody(BaseModel):
+    content: str
+    regex: bool = False
+
+
+@app.post("/search", summary="Search keywords in text — returns line/col matches")
+def search_content(body: SearchBody):
+    kw = _require_keywords()
+    keywords = load_keywords(str(kw))
+    pattern = _build_pattern(keywords, body.regex)
+    matches = []
+    for lineno, line in enumerate(body.content.splitlines(), 1):
+        for m in pattern.finditer(line):
+            matches.append({
+                "line": lineno, "col": m.start() + 1,
+                "keyword": m.group(0), "context": line.rstrip(),
+            })
+    return {"matches": matches, "total": len(matches)}
+
+
+class ClearBody(BaseModel):
+    content: str
+    replacement: str = ""
+    regex: bool = False
+
+
+@app.post("/clear", summary="Remove keywords from text — returns cleaned content")
+def clear_content(body: ClearBody):
+    kw = _require_keywords()
+    keywords = load_keywords(str(kw))
+    pattern = _build_pattern(keywords, body.regex)
+    result, count = pattern.subn(body.replacement, body.content)
+    return {"content": result, "count": count}
+
+
+class CleanlogBody(BaseModel):
+    content: str
+    regex: bool = False
+
+
+@app.post("/cleanlog", summary="Drop lines containing keywords — returns filtered content")
+def cleanlog_content(body: CleanlogBody):
+    kw = _require_keywords()
+    keywords = load_keywords(str(kw))
+    pattern = _build_pattern(keywords, body.regex)
+    lines = body.content.splitlines(keepends=True)
+    kept = [l for l in lines if not pattern.search(l)]
+    removed = len(lines) - len(kept)
+    return {"content": "".join(kept), "removed": removed, "kept": len(kept)}
 
 
 class AppendKeywordsBody(BaseModel):
