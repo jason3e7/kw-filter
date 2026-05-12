@@ -201,6 +201,183 @@ class TestGlobalMapping:
         assert "[[KW_" not in restored
 
 
+# ── Search ───────────────────────────────────────────────────────────────────
+
+class TestSearch:
+    def test_literal_finds_keyword(self):
+        r = client.post("/search", json={"content": "email: alice@corp.com"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["total"] == 1
+        assert data["matches"][0]["keyword"] == "alice@corp.com"
+
+    def test_literal_returns_line_and_col(self):
+        r = client.post("/search", json={"content": "line1\nalice@corp.com here"})
+        m = r.json()["matches"][0]
+        assert m["line"] == 2
+        assert m["col"] == 1
+
+    def test_literal_no_match(self):
+        r = client.post("/search", json={"content": "nothing sensitive"})
+        assert r.json()["total"] == 0
+
+    def test_literal_case_insensitive(self):
+        r = client.post("/search", json={"content": "ALICE@CORP.COM"})
+        assert r.json()["total"] == 1
+
+    def test_regex_finds_ip(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        r = client.post("/search", json={
+            "content": "server 10.0.0.1\nserver 192.168.1.2", "regex": True
+        })
+        data = r.json()
+        assert data["total"] == 2
+        assert {m["keyword"] for m in data["matches"]} == {"10.0.0.1", "192.168.1.2"}
+
+    def test_regex_kernel_version_not_matched(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        r = client.post("/search", json={
+            "content": "reboot 5.15.0-71-generic", "regex": True
+        })
+        assert r.json()["total"] == 0
+
+    def test_invalid_regex_returns_422(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text("[invalid\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        r = client.post("/search", json={"content": "anything", "regex": True})
+        assert r.status_code == 422
+
+    def test_missing_keywords_file_returns_503(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", tmp_path / "nonexistent.txt")
+        assert client.post("/search", json={"content": "alice@corp.com"}).status_code == 503
+
+
+# ── Clear ─────────────────────────────────────────────────────────────────────
+
+class TestClear:
+    def test_literal_removes_keyword(self):
+        r = client.post("/clear", json={"content": "user alice@corp.com end"})
+        assert r.status_code == 200
+        assert "alice@corp.com" not in r.json()["content"]
+        assert r.json()["count"] == 1
+
+    def test_literal_custom_replacement(self):
+        r = client.post("/clear", json={
+            "content": "user alice@corp.com", "replacement": "[REDACTED]"
+        })
+        assert r.json()["content"] == "user [REDACTED]"
+
+    def test_literal_no_match_count_zero(self):
+        r = client.post("/clear", json={"content": "nothing here"})
+        assert r.json()["count"] == 0
+        assert r.json()["content"] == "nothing here"
+
+    def test_regex_clears_all_ips(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        r = client.post("/clear", json={
+            "content": "allow 10.0.0.1 deny 192.168.1.1",
+            "replacement": "[IP]", "regex": True
+        })
+        assert r.json()["content"] == "allow [IP] deny [IP]"
+        assert r.json()["count"] == 2
+
+    def test_missing_keywords_file_returns_503(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", tmp_path / "nonexistent.txt")
+        assert client.post("/clear", json={"content": "text"}).status_code == 503
+
+
+# ── Cleanlog ──────────────────────────────────────────────────────────────────
+
+class TestCleanlog:
+    def test_literal_removes_matching_lines(self):
+        r = client.post("/cleanlog", json={
+            "content": "keep this\nalice@corp.com is here\nkeep too"
+        })
+        assert r.status_code == 200
+        data = r.json()
+        assert data["removed"] == 1
+        assert data["kept"] == 2
+        assert "alice@corp.com" not in data["content"]
+
+    def test_literal_no_match_keeps_all(self):
+        r = client.post("/cleanlog", json={"content": "line1\nline2"})
+        assert r.json()["removed"] == 0
+        assert r.json()["kept"] == 2
+
+    def test_regex_removes_ip_lines(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        content = (
+            "alice    pts/0  203.0.113.15  still logged in\n"
+            "root     tty1                 still logged in\n"
+            "bob      pts/1  198.51.100.42 logged out\n"
+        )
+        r = client.post("/cleanlog", json={"content": content, "regex": True})
+        data = r.json()
+        assert data["removed"] == 2
+        assert data["kept"] == 1
+        assert "root" in data["content"]
+        assert "203.0.113.15" not in data["content"]
+
+    def test_missing_keywords_file_returns_503(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", tmp_path / "nonexistent.txt")
+        assert client.post("/cleanlog", json={"content": "text"}).status_code == 503
+
+
+# ── Replace with regex ────────────────────────────────────────────────────────
+
+class TestRegexReplace:
+    def test_upload_text_regex_creates_token_per_matched_value(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        monkeypatch.setattr(srv, "MAPPING_FILE", tmp_path / "_mapping.json")
+        r = client.post("/files/text", json={
+            "name": "log.txt",
+            "content": "10.0.0.1 and 192.168.1.1",
+            "regex": True,
+        })
+        assert r.status_code == 200
+        fid = r.json()["file_id"]
+        content = client.get(f"/files/{fid}").text
+        assert "10.0.0.1" not in content
+        assert "192.168.1.1" not in content
+        assert content.count("[[KW_") == 2
+
+    def test_upload_text_regex_reuses_token_for_same_value(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        monkeypatch.setattr(srv, "MAPPING_FILE", tmp_path / "_mapping.json")
+        r = client.post("/files/text", json={
+            "name": "log.txt",
+            "content": "10.0.0.1 then again 10.0.0.1",
+            "regex": True,
+        })
+        fid = r.json()["file_id"]
+        content = client.get(f"/files/{fid}").text
+        tokens = [t.split("]]")[0] for t in content.split("[[KW_")[1:]]
+        assert tokens[0] == tokens[1], "same IP should reuse same token"
+
+    def test_upload_multipart_regex(self, monkeypatch, tmp_path):
+        kw = tmp_path / "kw.txt"
+        kw.write_text(r"\d+\.\d+\.\d+\.\d+" + "\n")
+        monkeypatch.setattr(srv, "KEYWORDS_FILE", kw)
+        monkeypatch.setattr(srv, "MAPPING_FILE", tmp_path / "_mapping.json")
+        r = client.post("/files?regex=true",
+                        files={"file": ("f.txt", b"server 10.0.0.1", "text/plain")})
+        assert r.status_code == 200
+        assert r.json()["tokens_created"] == 1
+
+
 # ── End-to-end ────────────────────────────────────────────────────────────────
 
 class TestEndToEnd:
