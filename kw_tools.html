@@ -215,6 +215,7 @@
     <h1>🔑 kw-filter</h1>
   </div>
   <p>關鍵字隱私過濾工具 — 送 AI 前先換掉敏感值，拿回回應後還原</p>
+  <button class="btn" onclick="loadDemo('last')" style="margin-left:auto;white-space:nowrap">📋 Demo: last</button>
 </header>
 
 <div class="tabs" id="tabs">
@@ -665,6 +666,44 @@ function status(msg) { document.getElementById('status').textContent = msg; }
     reader.readAsText(file, 'utf-8');
   });
 })();
+
+// ── Demo loader ──────────────────────────────────────────────────────────────
+
+const DEMOS = {
+  last: {
+    keywords: String.raw`\d+\.\d+\.\d+\.\d+`,
+    regex: true,
+    filename: 'last_output.txt',
+    input: [
+      'alice    pts/0        203.0.113.15     Sun May 11 10:23   still logged in',
+      'bob      pts/1        198.51.100.42    Sun May 11 09:15 - 10:01  (00:46)',
+      'alice    pts/0        203.0.113.15     Sat May 10 22:11 - 23:05  (00:54)',
+      'charlie  pts/2        192.0.2.88       Sat May 10 20:33 - 21:10  (00:37)',
+      'root     tty1                          Sat May 10 18:00   still logged in',
+      'bob      pts/3        198.51.100.42    Sat May 10 15:22 - 17:48  (02:26)',
+      'mallory  pts/4        45.33.32.156     Sat May 10 14:05 - 14:06  (00:01)',
+      'alice    pts/1        203.0.113.15     Fri May  9 11:30 - 13:20  (01:50)',
+      'charlie  pts/0        192.0.2.88       Fri May  9 09:00 - 10:15  (01:15)',
+      'reboot   system boot  5.15.0-71-generic Fri May  9 08:55',
+      '',
+      'wtmp begins Fri May  9 08:55:00 2026',
+    ].join('\n'),
+  },
+};
+
+function loadDemo(name) {
+  const d = DEMOS[name];
+  if (!d) return;
+  document.getElementById('keywords').value = d.keywords;
+  document.getElementById('regex-mode').checked = d.regex;
+  document.getElementById('input').value = d.input;
+  _inputFilename = d.filename;
+  document.getElementById('input-label').textContent = 'INPUT  —  ' + d.filename;
+  document.getElementById('output').value = '';
+  document.getElementById('info-body').innerHTML =
+    `<div class="op-desc" id="op-desc">${OP_DESC[currentOp] || ''}</div>`;
+  status('Demo 已載入：' + d.filename + '　Keyword: ' + d.keywords + '　Regex 模式: 開啟');
+}
 
 // Init
 refreshUI();
