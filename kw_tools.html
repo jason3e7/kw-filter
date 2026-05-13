@@ -671,8 +671,8 @@ function status(msg) { document.getElementById('status').textContent = msg; }
 
 const DEMOS = {
   last: {
-    keywords: String.raw`\d+\.\d+\.\d+\.\d+`,
-    regex: true,
+    keywords: '203.0.113.15\n45.33.32.156\n198.51.100.42',
+    regex: false,
     filename: 'last_output.txt',
     input: [
       'alice    pts/0        203.0.113.15     Sun May 11 10:23   still logged in',
@@ -702,7 +702,8 @@ function loadDemo(name) {
   document.getElementById('output').value = '';
   document.getElementById('info-body').innerHTML =
     `<div class="op-desc" id="op-desc">${OP_DESC[currentOp] || ''}</div>`;
-  status('Demo 已載入：' + d.filename + '　Keyword: ' + d.keywords + '　Regex 模式: 開啟');
+  const modeLabel = d.regex ? '　Regex 模式: 開啟' : '';
+  status('Demo 已載入：' + d.filename + modeLabel);
 }
 
 // Init
